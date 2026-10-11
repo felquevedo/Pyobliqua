@@ -9,7 +9,24 @@ from matplotlib.patches import Polygon, Circle
 
 
 def _recortar_semiplano(vertices, valor, limite, manter_maior=True):
-    """Recorta polígono pelo semiplano valor(p) >= limite (ou <=)."""
+    """Recorta um polígono por um semiplano definido por uma função escalar.
+
+    Args:
+        vertices (list[tuple[float, float]]): Vértices ordenados do polígono.
+        valor (Callable): Função que associa um escalar a cada ponto (x, y).
+        limite (float): Valor que define a fronteira de recorte.
+        manter_maior (bool): Se True, conserva valor(p) >= limite;
+            caso contrário, conserva valor(p) <= limite.
+
+    Returns:
+        list[tuple[float, float]]: Vértices do polígono recortado,
+        na ordem do contorno original. Retorna lista vazia para entrada vazia.
+
+    Notes:
+        As interseções são obtidas por interpolação linear nos lados.
+        A função valor deve variar linearmente em cada segmento para
+        que a interpolação represente corretamente a fronteira.
+    """
     if not vertices:
         return []
     def f(p):
@@ -36,14 +53,57 @@ def desenhar_secao(secao, area_total=None, *, ax=None, mostrar=True,
                    estado=None, x=None, alfa=None, mostrar_linha_neutra=True,
                    mostrar_regioes=True, mostrar_legenda=True,
                    esforcos=None, tipo_esforcos="solicitantes"):
-    """Desenha seção, armaduras e, opcionalmente, linha neutra.
+    """Desenha a geometria da seção, armaduras e informações opcionais.
 
-    Forneça `estado=EstadoDeformacao(secao, x, alfa)` OU `x` e `alfa`.
-    `x` é a profundidade da linha neutra medida da fibra extrema comprimida.
-    `alfa` é o ângulo em RADIANOS, na convenção de EstadoDeformacao.
-    `esforcos=(N, Mx, My)` em N e N.mm; vetores no plano para momentos.
-    N negativo é representado entrando no plano (⊗), positivo saindo (⊙).
-    Se não forem fornecidos, desenha somente a geometria.
+    Args:
+        secao: Seção com ``contorno``, ``furos``, ``barras`` e centroide
+            ``(xc, yc)``. As coordenadas geométricas são dadas em mm.
+        area_total (float | None): Área total de armadura em mm², usada
+            para barras definidas por proporções.
+        ax (matplotlib.axes.Axes | None): Eixos existentes para o desenho.
+            Se None, cria uma nova figura e novos eixos.
+        mostrar (bool): Se True, chama ``plt.show()``.
+        salvar_em (str | pathlib.Path | None): Caminho opcional para salvar
+            a figura, com resolução de 200 dpi.
+        numerar_barras (bool): Se True, identifica as barras por números.
+        mostrar_eixos (bool): Se True, mostra os eixos centroidais.
+        titulo (str): Título da figura.
+        unidade (str): Texto da unidade exibida nos eixos e na indicação
+            da profundidade da linha neutra; padrão ``'mm'``.
+        estado (EstadoDeformacao | None): Estado de deformação existente.
+            Não deve ser combinado com ``x`` ou ``alfa``.
+        x (float | None): Profundidade da linha neutra em mm, medida
+            da fibra extrema comprimida. Exige ``alfa`` quando informada.
+        alfa (float | None): Inclinação dos eixos rotacionados, em radianos.
+            Exige ``x`` quando informada.
+        mostrar_linha_neutra (bool): Se True, traça a linha neutra
+            quando houver estado e gradiente de deformação não nulo.
+        mostrar_regioes (bool): Se True, destaca a região comprimida
+            quando houver estado de deformação.
+        mostrar_legenda (bool): Se True, exibe a legenda.
+        esforcos (tuple[float, float, float] | None): Resultantes
+            ``(N, Mx, My)`` em N e N·mm, respectivamente.
+        tipo_esforcos (str): ``'solicitantes'`` ou ``'resistentes'``;
+            define o subscrito dos esforços desenhados.
+
+    Returns:
+        tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]: Figura
+        e eixos que contêm a representação da seção.
+
+    Raises:
+        ValueError: Se ``estado`` for combinado com ``x``/``alfa``;
+            se apenas um entre ``x`` e ``alfa`` for informado;
+            se o estado pertencer a outra seção; se os esforços forem
+            inválidos ou não finitos; se o tipo de esforços for inválido;
+            ou se uma barra tiver área não positiva.
+
+    Notes:
+        Deformações de compressão são negativas. A força normal
+        negativa é representada entrando no plano (⊗), e a positiva,
+        saindo do plano (⊙). Os momentos são indicados por setas
+        nos eixos globais, com sentidos definidos pelos sinais.
+        As resultantes são apenas representadas graficamente;
+        a função não calcula esforços resistentes.
     """
     if estado is not None and (x is not None or alfa is not None):
         raise ValueError('Use estado OU o par (x, alfa), não ambos.')
