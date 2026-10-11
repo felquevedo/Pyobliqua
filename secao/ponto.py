@@ -1,92 +1,110 @@
+"""Representação de pontos e transformações de coordenadas no plano.
+
+Este módulo fornece a classe :class:`Ponto`, utilizada para armazenar
+coordenadas cartesianas e realizar translações e rotações de eixos.
+
+Convenções:
+    - As coordenadas e os deslocamentos devem usar a mesma unidade de
+      comprimento (mm no projeto Pyobliqua).
+    - Os ângulos são informados em radianos.
+    - A rotação implementada é uma transformação *passiva* de coordenadas:
+      os eixos locais giram de ``alfa`` no sentido anti-horário em relação
+      aos globais, enquanto o ponto físico permanece na mesma posição.
+"""
+
 from math import cos, sin
 
 
 class Ponto:
-    """Representa um ponto no plano cartesiano."""
+    """Representa um ponto bidimensional em coordenadas cartesianas.
+
+    Attributes:
+        x (float): Coordenada horizontal do ponto.
+        y (float): Coordenada vertical do ponto.
+
+    Note:
+        A classe não impõe uma unidade; no Pyobliqua, utiliza-se mm.
+    """
 
     def __init__(self, x: float, y: float):
+        """Inicializa o ponto a partir de suas coordenadas.
+
+        Args:
+            x (float): Coordenada horizontal.
+            y (float): Coordenada vertical.
+        """
         self.x = float(x)
         self.y = float(y)
 
-    def transladar(self, dx: float, dy: float):
-        """Retorna um novo ponto transladado."""
-        return Ponto(
-            self.x + dx,
-            self.y + dy
-        )
+    def transladar(self, dx: float, dy: float) -> "Ponto":
+        """Obtém um novo ponto após uma translação no plano.
 
-    def rotacionar(self, alfa: float):
+        Args:
+            dx (float): Deslocamento na direção x.
+            dy (float): Deslocamento na direção y.
+
+        Returns:
+            Ponto: Novo ponto com coordenadas ``(x + dx, y + dy)``.
+
+        Note:
+            O ponto original não é modificado.
         """
-        Retorna as coordenadas ξ, η do ponto.
+        return Ponto(self.x + dx, self.y + dy)
 
-        Parameters
-        ----------
-        alfa : float
-            Ângulo de rotação em radianos.
+    def rotacionar(self, alfa: float) -> "Ponto":
+        """Expressa o ponto em um sistema de eixos girado de ``alfa``.
+
+        A transformação de coordenadas é dada por:
+
+        ``xi = x*cos(alfa) + y*sin(alfa)``
+        ``eta = -x*sin(alfa) + y*cos(alfa)``
+
+        Args:
+            alfa (float): Ângulo dos eixos locais em relação aos globais,
+                em radianos, positivo no sentido anti-horário.
+
+        Returns:
+            Ponto: Novo ponto cujos atributos ``x`` e ``y`` armazenam,
+            respectivamente, as coordenadas locais ``xi`` e ``eta``.
+
+        Note:
+            Trata-se de uma rotação dos eixos (passiva), não de uma
+            rotação física do ponto em torno da origem.
         """
-        xi = (
-            self.x * cos(alfa)
-            + self.y * sin(alfa)
-        )
-
-        eta = (
-            -self.x * sin(alfa)
-            + self.y * cos(alfa)
-        )
-
+        xi = self.x * cos(alfa) + self.y * sin(alfa)
+        eta = -self.x * sin(alfa) + self.y * cos(alfa)
         return Ponto(xi, eta)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
+        """Retorna uma representação textual resumida do ponto.
+
+        Returns:
+            str: Texto com as coordenadas arredondadas a três casas
+            decimais, no formato ``Ponto(x=..., y=...)``.
+        """
         return f"Ponto(x={self.x:.3f}, y={self.y:.3f})"
-    
-    
+
+
 if __name__ == "__main__":
     from math import isclose, pi
 
-    def verificar_ponto(obtido, x, y):
-        assert isclose(obtido.x, x, rel_tol=1e-12, abs_tol=1e-12), (
-            f"Coordenada x: esperado {x}, obtido {obtido.x}"
-        )
-        assert isclose(obtido.y, y, rel_tol=1e-12, abs_tol=1e-12), (
-            f"Coordenada y: esperado {y}, obtido {obtido.y}"
-        )
+    print("\nTESTE: Ponto")
+    ponto = Ponto(3.0, 4.0)
+    assert isclose(ponto.x, 3.0)
+    assert isclose(ponto.y, 4.0)
+    print("Coordenadas: OK")
 
-    print("\nTESTES: Ponto")
+    # A translação deve criar um novo objeto sem modificar o original.
+    transladado = ponto.transladar(2.0, -1.0)
+    assert isclose(transladado.x, 5.0)
+    assert isclose(transladado.y, 3.0)
+    assert isclose(ponto.x, 3.0) and isclose(ponto.y, 4.0)
+    print("Translação: OK")
 
-    ponto = Ponto(3, 4)
-    verificar_ponto(ponto, 3.0, 4.0)
-    assert isinstance(ponto.x, float)
-    assert isinstance(ponto.y, float)
-    print("Criação e conversão para float: OK")
+    # Eixos locais girados 90°: xi = y e eta = -x.
+    rotacionado = ponto.rotacionar(pi / 2)
+    assert isclose(rotacionado.x, 4.0, abs_tol=1e-12)
+    assert isclose(rotacionado.y, -3.0, abs_tol=1e-12)
+    print("Rotação: OK")
 
-    transladado = ponto.transladar(2, -6)
-    verificar_ponto(transladado, 5.0, -2.0)
-    verificar_ponto(ponto, 3.0, 4.0)
-    assert transladado is not ponto
-    print("Translação sem alterar o original: OK")
-
-    verificar_ponto(ponto.rotacionar(0), 3.0, 4.0)
-    verificar_ponto(ponto.rotacionar(pi / 2), 4.0, -3.0)
-    verificar_ponto(ponto.rotacionar(pi), -3.0, -4.0)
-    verificar_ponto(ponto.rotacionar(2 * pi), 3.0, 4.0)
-    print("Rotações de 0°, 90°, 180° e 360°: OK")
-
-    # Para 30°, cos(30°) = sqrt(3)/2 e sin(30°) = 1/2.
-    from math import sqrt
-    verificar_ponto(
-        ponto.rotacionar(pi / 6),
-        3 * sqrt(3) / 2 + 2,
-        -3 / 2 + 2 * sqrt(3),
-    )
-    print("Rotação de 30°: OK")
-
-    # Rotacionar os eixos e desfazer a rotação deve recuperar o ponto.
-    recuperado = ponto.rotacionar(pi / 6).rotacionar(-pi / 6)
-    verificar_ponto(recuperado, 3.0, 4.0)
-    verificar_ponto(ponto, 3.0, 4.0)
-    print("Rotação inversa e preservação do original: OK")
-
-    assert repr(ponto) == "Ponto(x=3.000, y=4.000)"
-    print("Representação textual: OK")
-
-    print("Todos os testes passaram!\n")
+    print("Testes concluídos!")

@@ -1,9 +1,36 @@
+"""Representação geométrica de uma seção poligonal de concreto armado.
+
+O módulo reúne um contorno externo, eventuais furos e barras de
+armadura, calculando área líquida, centroide e inércias centroidais.
+
+Convenções:
+    - Coordenadas e comprimentos: mm.
+    - Áreas: mm²; momentos e produto de inércia: mm⁴.
+    - Contorno externo anti-horário: contribuição positiva.
+    - Furos horários: contribuições negativas.
+    - Ângulos de transformação: radianos.
+
+O módulo descreve a geometria; não realiza o dimensionamento estrutural.
+"""
+
 from .poligono import Poligono
 from .barra import Barra
 from math import cos, sin
 
 class Secao:
-    """Seção poligonal de concreto armado."""
+    """Representa uma seção poligonal de concreto armado.
+
+    Attributes:
+        contorno (Poligono): Contorno externo da seção.
+        furos (list[Poligono]): Polígonos que representam vazios.
+        barras (list[Barra]): Barras de armadura da seção.
+        area (float): Área líquida orientada, em mm².
+        xc (float): Abscissa do centroide, em mm.
+        yc (float): Ordenada do centroide, em mm.
+        Ix (float): Momento de inércia centroidal em torno de x, mm⁴.
+        Iy (float): Momento de inércia centroidal em torno de y, mm⁴.
+        Ixy (float): Produto de inércia centroidal, mm⁴.
+    """
 
     def __init__(
         self,
@@ -11,6 +38,24 @@ class Secao:
         furos=None,
         barras=None
     ):
+        """Inicializa a seção, seus vazios e as barras de armadura.
+
+        Args:
+            contorno: Sequência de vértices (x, y) do contorno externo, em mm.
+            furos: Sequência opcional de polígonos que representam vazios.
+                Cada furo é uma sequência de vértices (x, y), em mm.
+            barras: Sequência opcional de objetos Barra ou de argumentos
+                posicionais aceitos por ``Barra(*barra)``.
+
+        Raises:
+            ValueError: Se algum polígono tiver menos de três vértices
+                ou se a área líquida calculada não for positiva.
+
+        Notes:
+            O contorno externo é orientado no sentido anti-horário
+            (área positiva) e os furos, no horário (área negativa).
+            A orientação é corrigida automaticamente.
+        """
         self.contorno = Poligono(contorno)
 
         self.furos = [
@@ -35,6 +80,20 @@ class Secao:
 
     def _calcular_propriedades(self):   
 
+        """Calcula as propriedades geométricas líquidas da seção.
+
+        A área e os momentos estáticos são obtidos por soma algébrica
+        das propriedades dos polígonos. As inércias em relação à origem
+        são transportadas para os eixos centroidais pelo teorema
+        dos eixos paralelos.
+
+        Raises:
+            ValueError: Se a área líquida for nula ou negativa.
+
+        Notes:
+            Atualiza ``area`` (mm²), ``xc`` e ``yc`` (mm), além de
+            ``Ix``, ``Iy`` e ``Ixy`` (mm⁴).
+        """
         poligonos = [
             self.contorno,
             *self.furos
@@ -80,6 +139,15 @@ class Secao:
 
     def coordenadas_locais(self, ponto):
     
+        """Obtém as coordenadas de um ponto relativas ao centroide.
+
+        Args:
+            ponto (Ponto): Ponto expresso no sistema global, em mm.
+
+        Returns:
+            tuple[float, float]: Coordenadas (x, y) em relação ao
+            centroide da seção, em mm.
+        """
         x = ponto.x - self.xc
         y = ponto.y - self.yc
     
@@ -87,6 +155,22 @@ class Secao:
 
     def coordenadas_rotacionadas(self, ponto, alfa):    
 
+        """Transforma as coordenadas para eixos centroidais rotacionados.
+
+        Args:
+            ponto (Ponto): Ponto no sistema global, em mm.
+            alfa (float): Ângulo de rotação dos eixos, em radianos.
+
+        Returns:
+            tuple[float, float]: Coordenadas (xi, eta), em mm.
+
+        Notes:
+            xi = x*cos(alfa) + y*sin(alfa)
+            eta = -x*sin(alfa) + y*cos(alfa)
+
+            Trata-se da rotação dos eixos de referência, e não
+            da rotação física do ponto.
+        """
         x, y = self.coordenadas_locais(ponto)   
 
         xi = (
@@ -103,6 +187,18 @@ class Secao:
 
     def limites_eta_concreto(self, alfa):   
 
+        """Obtém as coordenadas extremas do concreto no eixo eta.
+
+        Args:
+            alfa (float): Ângulo dos eixos locais, em radianos.
+
+        Returns:
+            tuple[float, float]: (eta_inferior, eta_superior), em mm.
+
+        Notes:
+            Os extremos são calculados a partir dos vértices do
+            contorno externo. Os furos não alteram esses limites.
+        """
         pontos = self.contorno.vertices 
 
         etas = [
@@ -118,6 +214,15 @@ class Secao:
 
     def limites_eta_armadura(self, alfa):   
 
+        """Obtém as coordenadas extremas das barras no eixo eta.
+
+        Args:
+            alfa (float): Ângulo dos eixos locais, em radianos.
+
+        Returns:
+            tuple[float | None, float | None]: Menor e maior coordenada
+            eta das barras, em mm; (None, None) se não houver barras.
+        """
         if not self.barras:
             return None, None   
 
@@ -132,12 +237,31 @@ class Secao:
         return min(etas), max(etas)
 
     def altura(self, alfa):
+        """Calcula a altura total da seção na direção eta.
+
+        Args:
+            alfa (float): Ângulo dos eixos locais, em radianos.
+
+        Returns:
+            float: Distância entre as fibras extremas de concreto, em mm.
+        """
         eta_i, eta_s = self.limites_eta_concreto(alfa)
     
         return eta_s - eta_i
     
     
     def altura_util(self, alfa):
+        """Calcula a distância da fibra superior à barra mais inferior.
+
+        Args:
+            alfa (float): Ângulo dos eixos locais, em radianos.
+
+        Returns:
+            float: Altura útil na direção eta, em mm.
+
+        Raises:
+            ValueError: Se a seção não possuir barras de armadura.
+        """
         eta_i_aco, _ = self.limites_eta_armadura(alfa)
         _, eta_s = self.limites_eta_concreto(alfa)
     

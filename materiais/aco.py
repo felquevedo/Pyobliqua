@@ -1,5 +1,26 @@
+"""Modelo constitutivo elastoplástico perfeito para o aço classe A.
+
+O diagrama tensão-deformação é linear até a tensão de escoamento de
+cálculo e apresenta um patamar plástico, tanto em tração quanto em
+compressão. Não são considerados encruamento nem ruptura por deformação.
+
+Convenções:
+    - Tensões e resistências: MPa (N/mm²).
+    - Módulo de elasticidade: MPa.
+    - Deformações: adimensionais (mm/mm).
+    - Tração: tensão e deformação positivas.
+    - Compressão: tensão e deformação negativas.
+"""
+
+
 class Aco:
-    """Modelo elastoplástico perfeito do aço classe A."""
+    """Representa o comportamento elastoplástico perfeito do aço classe A.
+
+    Attributes:
+        fyk (float): Resistência característica ao escoamento, em MPa.
+        gamma_s (float): Coeficiente parcial de segurança do aço.
+        es (float): Módulo de elasticidade longitudinal, em MPa.
+    """
 
     def __init__(
         self,
@@ -7,6 +28,18 @@ class Aco:
         gamma_s: float = 1.15,
         es: float = 210_000.0
     ):
+        """Inicializa os parâmetros mecânicos do aço.
+
+        Args:
+            fyk (float): Resistência característica ao escoamento, em MPa.
+            gamma_s (float): Coeficiente parcial de segurança, adimensional.
+                O valor padrão é 1,15.
+            es (float): Módulo de elasticidade, em MPa.
+                O valor padrão é 210.000 MPa.
+
+        Raises:
+            ValueError: Se ``fyk``, ``gamma_s`` ou ``es`` não for positivo.
+        """
         if fyk <= 0:
             raise ValueError("fyk deve ser positivo.")
 
@@ -21,23 +54,49 @@ class Aco:
         self.es = float(es)
 
     @property
-    def fyd(self):
+    def fyd(self) -> float:
+        """Calcula a resistência de cálculo ao escoamento, em MPa.
+
+        Returns:
+            float: Razão ``fyk / gamma_s``, em MPa.
+        """
         return self.fyk / self.gamma_s
 
     @property
-    def epsilon_yd(self):
+    def epsilon_yd(self) -> float:
+        """Calcula a deformação correspondente ao escoamento de cálculo.
+
+        Returns:
+            float: Razão ``fyd / es``, adimensional.
+        """
         return self.fyd / self.es
 
     def tensao(self, epsilon: float) -> float:
-        """Retorna a tensão no aço em MPa."""   
+        """Calcula a tensão no aço para uma deformação longitudinal.
 
-        sigma_elastica = self.es * epsilon  
+        Args:
+            epsilon (float): Deformação longitudinal, adimensional;
+                positiva em tração e negativa em compressão.
 
+        Returns:
+            float: Tensão no aço, em MPa, limitada ao intervalo
+            ``[-fyd, fyd]``.
+
+        Notes:
+            No trecho elástico, ``sigma = es * epsilon``. Após atingir
+            o escoamento de cálculo, a tensão permanece constante em
+            ``+fyd`` (tração) ou ``-fyd`` (compressão).
+        """
+        # Resposta elástica inicial, válida até o escoamento de cálculo.
+        sigma_elastica = self.es * epsilon
+
+        # Patamar plástico em tração.
         if sigma_elastica > self.fyd:
-            return self.fyd 
+            return self.fyd
 
+        # Patamar plástico em compressão.
         if sigma_elastica < -self.fyd:
-            return -self.fyd    
+            return -self.fyd
 
         return sigma_elastica
 

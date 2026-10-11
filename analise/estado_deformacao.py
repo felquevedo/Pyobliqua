@@ -1,12 +1,62 @@
-class EstadoDeformacao:
-    """Estado de deformação último da seção.
+"""Compatibilidade de deformações no estado limite último.
 
-    epsilon_i mantém significado histórico dependente do domínio.
-    Prefira epsilon_concreto_inferior e epsilon_aco_inferior.
+Determina os domínios de deformação e o campo linear de deformações
+longitudinais de uma seção de concreto armado a partir da posição
+da linha neutra e da orientação dos eixos locais.
+
+Convenções:
+    - Coordenadas e comprimentos: mm.
+    - Ângulos: radianos.
+    - Deformações: adimensionais (por exemplo, -0.0035 = -3,5‰).
+    - Compressão negativa; tração positiva.
+    - A profundidade ``x`` é medida desde a fibra superior.
+
+A formulação e os limites são os adotados pelo projeto original.
+"""
+
+class EstadoDeformacao:
+    """Representa o estado último de deformação de uma seção transversal.
+
+    Attributes:
+        secao: Seção transversal analisada.
+        x (float): Profundidade da linha neutra, em mm.
+        alfa (float): Ângulo dos eixos locais, em radianos.
+        h (float): Altura total do concreto na direção eta, em mm.
+        d (float): Altura útil na direção eta, em mm.
+        eta_s (float): Coordenada da fibra superior do concreto, em mm.
+        eta_i_aco (float): Menor coordenada eta das barras, em mm.
+        epsilon_s (float): Deformação da fibra superior, adimensional.
+        epsilon_i (float): Deformação inferior de referência, adimensional;
+            seu significado depende do domínio de deformação.
+        b (float): Gradiente do campo de deformações, em mm⁻¹.
+        c (float): Termo constante do campo de deformações, adimensional.
+
+    Notes:
+        As deformações são adimensionais: 0.0035 corresponde a 3,5‰.
+        Compressão é negativa e tração positiva. Para obter deformações
+        inferiores sem ambiguidade, use ``epsilon_concreto_inferior``
+        e ``epsilon_aco_inferior``.
     """
 
     def __init__(self, secao, x, alfa):
 
+        """Inicializa o estado último de deformação da seção.
+
+        Args:
+            secao: Seção transversal com métodos geométricos de altura,
+                altura útil e transformação de coordenadas.
+            x (float): Profundidade da linha neutra medida a partir da
+                fibra superior do concreto, em mm.
+            alfa (float): Ângulo de rotação dos eixos locais, em radianos.
+
+        Raises:
+            ValueError: Se a seção não possuir barras, conforme a
+                implementação de ``secao.altura_util``.
+
+        Notes:
+            Calcula as deformações extremas e os coeficientes ``b`` e ``c``
+            do campo linear de deformações ``epsilon(eta) = b*eta + c``.
+        """
         self.secao = secao
         self.x = float(x)
         self.alfa = float(alfa)
@@ -31,6 +81,15 @@ class EstadoDeformacao:
     @property
     def dominio(self):
 
+        """Classifica o domínio de deformação pela posição da linha neutra.
+
+        Returns:
+            str: Identificador ``"1-2"``, ``"3-4"``, ``"4a"`` ou ``"5"``.
+
+        Notes:
+            Os limites são ``(0.0035/0.0135)*d``, ``d`` e ``h``.
+            O rótulo ``"1-2"`` é usado também quando ``x <= 0``.
+        """
         if self.x <= (0.0035 / 0.0135) * self.d:
             return "1-2"
 
@@ -44,6 +103,19 @@ class EstadoDeformacao:
 
     def _deformacoes_extremas(self):
 
+        """Determina as deformações de referência para o domínio atual.
+
+        Returns:
+            tuple[float, float]: ``(epsilon_s, epsilon_i)``, adimensionais.
+
+        Notes:
+            ``epsilon_s`` corresponde à fibra superior do concreto.
+            Por convenção histórica, ``epsilon_i`` corresponde à barra
+            inferior nos domínios 1-2 e 3-4, mas à fibra inferior do
+            concreto nos domínios 4a e 5. Prefira as propriedades explícitas
+            ``epsilon_aco_inferior`` e ``epsilon_concreto_inferior``.
+            Compressão é negativa e tração é positiva.
+        """
         x = self.x
         d = self.d
         h = self.h
@@ -89,6 +161,17 @@ class EstadoDeformacao:
 
     def _calcular_bc(self): 
 
+        """Calcula os coeficientes do campo linear de deformações.
+
+        Returns:
+            tuple[float, float]: Coeficientes ``(b, c)``, em mm⁻¹ e
+            adimensional, respectivamente.
+
+        Notes:
+            A linha neutra tem coordenada ``eta_s - x``. Para ``x``
+            aproximadamente nulo, utiliza-se ``b = -0.010/d`` para evitar
+            divisão por zero, preservando a implementação original.
+        """
         if abs(self.x) < 1e-12:
             b = -0.010 / self.d
         else:
@@ -101,20 +184,45 @@ class EstadoDeformacao:
         return b, c
 
     def deformacao(self, eta):
+        """Calcula a deformação longitudinal em uma coordenada local.
+
+        Args:
+            eta (float): Coordenada no eixo local eta, em mm.
+
+        Returns:
+            float: Deformação longitudinal adimensional, com compressão
+            negativa e tração positiva.
+        """
         return self.b * eta + self.c
 
     @property
     def epsilon_concreto_inferior(self):
-        """Deformação na borda inferior do concreto (sinal: compressão negativa)."""
+        """Obtém a deformação na fibra inferior do concreto.
+
+        Returns:
+            float: Deformação longitudinal adimensional; compressão negativa.
+        """
         return self.deformacao(self.eta_s - self.h)
 
     @property
     def epsilon_aco_inferior(self):
-        """Deformação da barra com menor coordenada eta."""
+        """Obtém a deformação na barra com menor coordenada eta.
+
+        Returns:
+            float: Deformação longitudinal adimensional, positiva em tração.
+        """
         return self.deformacao(self.eta_i_aco)
 
     def deformacao_barra(self, barra):
 
+        """Calcula a deformação longitudinal de uma barra de armadura.
+
+        Args:
+            barra: Objeto de armadura cuja posição é dada por ``barra.posicao``.
+
+        Returns:
+            float: Deformação longitudinal adimensional na posição da barra.
+        """
         _, eta = (
             self.secao.coordenadas_rotacionadas(
                 barra.posicao,

@@ -1,10 +1,53 @@
+"""Propriedades geométricas orientadas de polígonos planos.
+
+Calcula área, centroide, momentos de inércia e produto de inércia por
+somatórios sobre os lados de uma poligonal fechada (fórmula do cadarço).
+
+Convenções:
+    * Vértices em sentido anti-horário: área e inércias positivas.
+    * Vértices em sentido horário: área e inércias negativas.
+    * ``IX``, ``IY`` e ``IXY``: grandezas em relação aos eixos na origem.
+    * ``Ix``, ``Iy`` e ``Ixy``: grandezas em relação aos eixos centroidais.
+    * Coordenadas em mm, área em mm² e inércias em mm⁴.
+
+As grandezas orientadas permitem subtrair furos por meio de polígonos
+horários. O módulo não valida autointerseções nem área nula; esta última
+provoca divisão por zero no cálculo do centroide.
+"""
+
 from .ponto import Ponto
 
 
 class Poligono:
-    """Representa um polígono plano definido pelos seus vértices."""
+    """Representa uma poligonal fechada e suas propriedades geométricas.
+
+    A última aresta é formada automaticamente entre o último vértice e
+    o primeiro. Não é necessário repetir o primeiro vértice ao final.
+
+    Attributes:
+        vertices (list[Ponto]): Vértices na ordem fornecida.
+        area (float): Área orientada, em mm².
+        xc (float): Coordenada x do centroide, em mm.
+        yc (float): Coordenada y do centroide, em mm.
+        IX (float): Momento orientado em relação ao eixo x na origem, mm⁴.
+        IY (float): Momento orientado em relação ao eixo y na origem, mm⁴.
+        IXY (float): Produto de inércia orientado na origem, mm⁴.
+        Ix (float): Momento orientado em relação ao eixo x centroidal, mm⁴.
+        Iy (float): Momento orientado em relação ao eixo y centroidal, mm⁴.
+        Ixy (float): Produto de inércia orientado centroidal, mm⁴.
+    """
 
     def __init__(self, vertices):
+        """Inicializa o polígono e calcula suas propriedades geométricas.
+
+        Args:
+            vertices (iterable[Ponto | tuple[float, float]]): Vértices em
+                sequência ao longo do contorno; coordenadas em mm.
+
+        Raises:
+            ValueError: Se forem fornecidos menos de três vértices.
+            ZeroDivisionError: Se a área orientada calculada for nula.
+        """
         self.vertices = [
             p if isinstance(p, Ponto) else Ponto(*p)
             for p in vertices
@@ -17,115 +60,112 @@ class Poligono:
 
         self.area = self._calcular_area()
         self.xc, self.yc = self._calcular_centroide()
-        self.IX, self.IY, self.IXY = (
-            self._calcular_inercias_origem()
-        )
+        self.IX, self.IY, self.IXY = self._calcular_inercias_origem()
 
+        # Teorema dos eixos paralelos aplicado às grandezas orientadas.
         self.Ix = self.IX - self.area * self.yc**2
         self.Iy = self.IY - self.area * self.xc**2
-        self.Ixy = (
-            self.IXY
-            - self.area * self.xc * self.yc
-        )
+        self.Ixy = self.IXY - self.area * self.xc * self.yc
 
     def _pares_vertices(self):
-        """Percorre cada lado do polígono."""
-        n = len(self.vertices)
+        """Percorre os lados do contorno, incluindo o lado de fechamento.
 
+        Yields:
+            tuple[Ponto, Ponto]: Vértices inicial e final de cada lado.
+        """
+        n = len(self.vertices)
         for i in range(n):
             p1 = self.vertices[i]
             p2 = self.vertices[(i + 1) % n]
-
             yield p1, p2
 
     def _calcular_area(self):
-        soma = 0.0
+        """Calcula a área orientada pela fórmula do cadarço.
 
+        Returns:
+            float: Área orientada em mm²; positiva para contorno
+            anti-horário e negativa para contorno horário.
+        """
+        soma = 0.0
         for p1, p2 in self._pares_vertices():
             soma += p1.x * p2.y - p2.x * p1.y
-
         return soma / 2.0
 
     def _calcular_centroide(self):
+        """Calcula as coordenadas do centroide da região poligonal.
+
+        Returns:
+            tuple[float, float]: Coordenadas (xc, yc), em mm.
+
+        Raises:
+            ZeroDivisionError: Se a área orientada for nula.
+        """
         soma_x = 0.0
         soma_y = 0.0
-
         for p1, p2 in self._pares_vertices():
-
-            delta = (
-                p1.x * p2.y
-                - p2.x * p1.y
-            )
-
+            # Determinante associado ao lado orientado p1 -> p2.
+            delta = p1.x * p2.y - p2.x * p1.y
             soma_x += (p1.x + p2.x) * delta
             soma_y += (p1.y + p2.y) * delta
-
         xc = soma_x / (6.0 * self.area)
         yc = soma_y / (6.0 * self.area)
-
         return xc, yc
 
     def _calcular_inercias_origem(self):
+        """Integra os momentos de segunda ordem sobre o polígono.
+
+        Returns:
+            tuple[float, float, float]: (IX, IY, IXY), em mm⁴, em
+            relação aos eixos coordenados que passam pela origem.
+            Os sinais seguem a orientação dos vértices.
+        """
         ix = 0.0
         iy = 0.0
-        ixy = 0.0   
-
-        for p1, p2 in self._pares_vertices():   
-
-            delta = (
-                p1.x * p2.y
-                - p2.x * p1.y
-            )   
-
-            ix += (
-                p1.y**2
-                + p1.y * p2.y
-                + p2.y**2
-            ) * delta   
-
-            iy += (
-                p1.x**2
-                + p1.x * p2.x
-                + p2.x**2
-            ) * delta   
-
+        ixy = 0.0
+        for p1, p2 in self._pares_vertices():
+            delta = p1.x * p2.y - p2.x * p1.y
+            # Somatórios analíticos das integrais de y², x² e xy.
+            ix += (p1.y**2 + p1.y * p2.y + p2.y**2) * delta
+            iy += (p1.x**2 + p1.x * p2.x + p2.x**2) * delta
             ixy += (
                 2 * p1.x * p1.y
                 + p1.x * p2.y
                 + p2.x * p1.y
                 + 2 * p2.x * p2.y
-            ) * delta   
-
+            ) * delta
         ix /= 12.0
         iy /= 12.0
-        ixy /= 24.0 
-
+        ixy /= 24.0
         return ix, iy, ixy
 
     @property
     def sentido(self):
-        if self.area > 0:
-            return "anti-horario"   
+        """Retorna a orientação dos vértices conforme o sinal da área.
 
-        return "horario"    
-    
+        Returns:
+            str: ``"anti-horario"`` se a área for positiva; caso
+            contrário, ``"horario"``.
+        """
+        if self.area > 0:
+            return "anti-horario"
+        return "horario"
 
     def inverter(self):
-        self.vertices.reverse() 
+        """Inverte a ordem dos vértices e recalcula as propriedades.
 
+        A inversão muda o sinal da área e das inércias orientadas,
+        mas mantém a posição do centroide.
+
+        Returns:
+            None: Modifica o objeto diretamente.
+        """
+        self.vertices.reverse()
         self.area = self._calcular_area()
-        self.xc, self.yc = self._calcular_centroide()   
-
-        self.IX, self.IY, self.IXY = (
-            self._calcular_inercias_origem()
-        )   
-
+        self.xc, self.yc = self._calcular_centroide()
+        self.IX, self.IY, self.IXY = self._calcular_inercias_origem()
         self.Ix = self.IX - self.area * self.yc**2
         self.Iy = self.IY - self.area * self.xc**2
-        self.Ixy = (
-            self.IXY
-            - self.area * self.xc * self.yc
-        )
+        self.Ixy = self.IXY - self.area * self.xc * self.yc
 
 if __name__ == "__main__":
     from math import isclose
