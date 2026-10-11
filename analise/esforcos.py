@@ -1,3 +1,21 @@
+"""Cálculo das resultantes resistentes de concreto e aço na seção.
+
+As contribuições do concreto são integradas sobre regiões do diagrama
+parábola-retângulo; as do aço são somadas como forças concentradas nas barras.
+
+Convenções:
+    - Comprimentos e posições: mm; áreas: mm².
+    - Tensões: MPa (N/mm²); forças normais: N; momentos: N·mm.
+    - Tração positiva e compressão negativa.
+    - M_xi = integral(sigma * eta, dA).
+    - M_eta = -integral(sigma * xi, dA).
+    - Os momentos totais são transformados dos eixos (xi, eta)
+      para os eixos globais (x, y).
+
+A integração por recorte poligonal simples é destinada inicialmente
+a contornos convexos, conforme a limitação da implementação original.
+"""
+
 from analise.integracao import (
     separar_regioes,
     integrar_poligono,
@@ -6,22 +24,28 @@ from math import cos, sin
 
 
 def esforcos_concreto(secao, estado, concreto):
-    """
-    Calcula os esforços resistentes do concreto.
+    """Calcula a força normal e os momentos resistentes do concreto.
 
-    Retorna
-    -------
-    Nc : float
-        Força normal (N).
-    Mc_xi : float
-        Momento em torno de xi (N.mm).
-    Mc_eta : float
-        Momento em torno de eta (N.mm).
+    Args:
+        secao: Seção com contorno externo, furos e transformação de
+            coordenadas para os eixos rotacionados.
+        estado: Estado de deformação com ``b``, ``c``, ``alfa`` e
+            método ``deformacao(eta)``.
+        concreto: Material com propriedade ``sigma_cd`` em MPa.
 
-    Observação
-    ----------
-    Esta versão utiliza o recorte poligonal simples,
-    devendo ser aplicada inicialmente a contornos convexos.
+    Returns:
+        tuple[float, float, float]: ``(Nc, Mc_xi, Mc_eta)``,
+        com força em N e momentos em N·mm, nos eixos rotacionados.
+
+    Notes:
+        No trecho parabólico, a tensão é representada pelo polinômio
+        ``D0 + D1*eta + D2*eta**2``, integrado por monômios de Green.
+        No patamar, a tensão é ``-sigma_cd``. O contorno externo
+        contribui positivamente e os furos, negativamente, pela
+        orientação de seus vértices.
+
+        A rotina usa recorte poligonal simples e deve ser aplicada
+        inicialmente a contornos convexos.
     """
 
     sigma_cd = concreto.sigma_cd
@@ -110,6 +134,24 @@ def esforcos_aco(
     area_total=None
 ):
 
+    """Soma as contribuições das barras para os esforços resistentes.
+
+    Args:
+        secao: Seção que contém as barras e transforma coordenadas.
+        estado: Estado de deformação com ``alfa`` e ``deformacao(eta)``.
+        aco: Modelo constitutivo com método ``tensao(epsilon)`` em MPa.
+        area_total (float | None): Área total de armadura, em mm²,
+            utilizada quando as barras são definidas por proporções.
+
+    Returns:
+        tuple[float, float, float]: ``(Ns, Ms_xi, Ms_eta)``,
+        com força em N e momentos em N·mm, nos eixos rotacionados.
+
+    Notes:
+        Para cada barra, ``F = sigma * A``; os momentos seguem
+        ``Ms_xi += F*eta`` e ``Ms_eta -= F*xi``. A obtenção da área
+        é delegada ao método ``barra.obter_area(area_total)``.
+    """
     Ns = 0.0
     Ms_xi = 0.0
     Ms_eta = 0.0
@@ -144,27 +186,25 @@ def esforcos_resistentes(
     aco,
     area_total=None
 ):
-    """
-    Calcula os esforços resistentes totais da seção.
+    """Calcula os esforços resistentes totais nos eixos globais.
 
-    Parameters
-    ----------
-    secao : Secao
-        Geometria da seção e disposição das barras.
-    estado : EstadoDeformacao
-        Estado de deformação definido por x e alfa.
-    concreto : Concreto
-        Modelo constitutivo do concreto.
-    aco : Aco
-        Modelo constitutivo do aço.
-    area_total : float, optional
-        Área total de armadura, necessária quando
-        as barras utilizam proporções de área.
+    Args:
+        secao: Geometria da seção e disposição das barras.
+        estado: Estado de deformação definido por profundidade da
+            linha neutra e ângulo ``alfa`` (radianos).
+        concreto: Modelo constitutivo do concreto.
+        aco: Modelo constitutivo do aço.
+        area_total (float | None): Área total de armadura, em mm²,
+            necessária quando as barras usam proporções de área.
 
-    Returns
-    -------
-    tuple[float, float, float]
-        (Nr, Mrx, Mry), em N e N.mm.
+    Returns:
+        tuple[float, float, float]: ``(Nr, Mrx, Mry)``,
+        com força normal em N e momentos globais em N·mm.
+
+    Notes:
+        Soma separadamente as parcelas de concreto e aço nos
+        eixos rotacionados (xi, eta), depois transforma os
+        momentos para os eixos globais (x, y).
     """
 
     # Contribuição do concreto

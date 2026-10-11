@@ -1,3 +1,19 @@
+"""Resolução numérica do equilíbrio resistente de seções de concreto armado.
+
+O dimensionamento procura a profundidade da linha neutra ``x``, o ângulo
+``alfa`` e a área total de armadura ``As`` que equilibram as solicitações.
+O problema é resolvido por mínimos quadrados não lineares com limites,
+utilizando ``scipy.optimize.least_squares``.
+
+Convenções:
+    - ``x`` em mm, ``alfa`` em radianos e ``As`` em mm².
+    - Forças normais em N e momentos em N·mm.
+    - Resíduos são adimensionais após normalização pelas escalas.
+    - A convergência do otimizador não garante, por si só, o equilíbrio.
+
+Os limites numéricos de busca não substituem verificações normativas.
+"""
+
 import numpy as np
 
 from scipy.optimize import least_squares
@@ -18,8 +34,28 @@ def residuos_equilibrio(
     escala_N,
     escala_M
 ):
-    """
-    Calcula os resíduos normalizados de equilíbrio.
+    """Calcula os resíduos adimensionais de equilíbrio da seção.
+
+    Args:
+        variaveis (array_like): Sequência ``(x, alfa, As)``, em mm,
+            radianos e mm², respectivamente.
+        secao: Geometria e armaduras da seção.
+        concreto: Modelo constitutivo do concreto.
+        aco: Modelo constitutivo do aço.
+        Nsd (float): Força normal solicitante, em N.
+        Msdx (float): Momento solicitante em torno de x, em N·mm.
+        Msdy (float): Momento solicitante em torno de y, em N·mm.
+        escala_N (float): Escala de normalização da força, em N.
+        escala_M (float): Escala de normalização dos momentos, em N·mm.
+
+    Returns:
+        numpy.ndarray: Três resíduos ``[(Nr-Nsd)/escala_N,
+        (Mrx-Msdx)/escala_M, (Mry-Msdy)/escala_M]``. Para ``x <= 0``
+        ou ``As < 0``, retorna a penalidade ``[1e6, 1e6, 1e6]``.
+
+    Notes:
+        A função avalia o estado de deformação e os esforços resistentes
+        correspondentes à estimativa atual das incógnitas.
     """
 
     x, alfa, As = variaveis
@@ -54,14 +90,52 @@ def resolver_equilibrio(
     taxa_max=0.08, fator_x_max=5.0, multiplas_tentativas=True,
     tolerancia_equilibrio=1e-6
 ):
-    """Resolve o equilíbrio com limites e múltiplas estimativas iniciais.
+    """Dimensiona a armadura buscando o equilíbrio por mínimos quadrados.
 
-    x em mm, alfa em radianos, As em mm²; solicitações em N e N.mm.
-    taxa_max e fator_x_max são limites numéricos configuráveis, não
-    verificações normativas de taxa de armadura ou domínio último.
+    Args:
+        secao: Seção com área positiva e barras definidas por proporções
+            positivas que somam 1, sem áreas fixas.
+        concreto: Modelo constitutivo do concreto.
+        aco: Modelo constitutivo do aço.
+        Nsd (float): Força normal solicitante, em N.
+        Msdx (float): Momento solicitante em x, em N·mm.
+        Msdy (float): Momento solicitante em y, em N·mm.
+        x0 (float): Estimativa inicial da linha neutra, em mm.
+        alfa0 (float): Estimativa inicial do ângulo, em radianos.
+        As0 (float): Estimativa inicial da área de aço, em mm².
+        taxa_max (float): Limite numérico ``As <= taxa_max*secao.area``;
+            padrão 0.08. Não constitui verificação normativa.
+        fator_x_max (float): Limite numérico ``x <= fator_x_max*h``;
+            padrão 5.0, com ``h = secao.altura(0.0)``.
+        multiplas_tentativas (bool): Se True, testa outras estimativas
+            iniciais para reduzir a dependência da partida.
+        tolerancia_equilibrio (float): Limite da norma euclidiana dos
+            resíduos normalizados; padrão 1e-6.
 
-    Retorna OptimizeResult. `success` indica equilíbrio dentro da
-    tolerância, enquanto `otimizador_success` guarda a parada do SciPy.
+    Returns:
+        scipy.optimize.OptimizeResult: Melhor resultado segundo a norma
+        dos resíduos, com atributos adicionais:
+
+        - ``x``: vetor ``[x, alfa, As]`` otimizado.
+        - ``norma_residuos``: norma euclidiana dos resíduos.
+        - ``equilibrio_atendido``: indica se a norma satisfaz a tolerância.
+        - ``otimizador_success``: sucesso da parada do SciPy.
+        - ``success``: True somente se o SciPy teve sucesso e o
+          equilíbrio atende à tolerância.
+        - ``tentativas``: quantidade de estimativas efetivamente avaliadas.
+
+    Raises:
+        ValueError: Se a área da seção ou os limites forem inválidos,
+            não houver barras, existirem áreas fixas ou as proporções
+            das barras não forem positivas e somarem 1.
+
+    Notes:
+        Os limites de ``x``, ``alfa`` e ``As`` são impostos ao otimizador.
+        Os ângulos iniciais são reduzidos ao intervalo de -pi a pi.
+        As escalas usadas nos resíduos são ``max(abs(Nsd), 1e5)`` e
+        ``max(abs(Msdx), abs(Msdy), 1e7)``. O menor resíduo pode ainda
+        representar um estado sem equilíbrio; confira ``success`` e
+        ``equilibrio_atendido`` antes de utilizar a solução.
     """
     if secao.area <= 0 or taxa_max <= 0 or fator_x_max <= 0:
         raise ValueError("Área da seção e limites devem ser positivos.")

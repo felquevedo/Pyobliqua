@@ -1,3 +1,23 @@
+"""Verificação da seção no estado-limite último por fator de reserva.
+
+O procedimento mantém fixa a área total de armadura ``As`` e procura
+``x``, ``alfa`` e ``lambda`` tais que os esforços resistentes sejam
+proporcionais às solicitações de cálculo:
+
+    (Nr, Mrx, Mry) = lambda * (Nsd, Msdx, Msdy)
+
+Convenções:
+    - Comprimentos e profundidade da linha neutra: mm.
+    - Áreas: mm²; tensões: MPa; forças: N; momentos: N·mm.
+    - Ângulos: radianos; deformações: adimensionais.
+    - ``lambda`` é adimensional; valores inferiores a 1 indicam
+      resistência insuficiente ao longo do raio de carregamento,
+      desde que a solução de equilíbrio seja válida.
+
+O método usa ``scipy.optimize.least_squares`` e múltiplas estimativas
+iniciais opcionais. Os limites de busca são numéricos, não verificações
+normativas independentes.
+"""
 """Verificacao no ELU por fator de reserva lambda.
 
 Unidades: mm, N, MPa, N.mm. Angulos em radianos.
@@ -13,10 +33,62 @@ def resolver_verificacao(secao, concreto, aco, As, Nsd, Msdx, Msdy,
                          x0=None, alfa0=0.0, lambda0=1.0,
                          fator_x_max=20.0, tolerancia_equilibrio=1e-6,
                          multiplas_tentativas=True):
-    """Determina x, alfa, lambda tal que (Nr,Mr) = lambda*(Nsd,Msd).
+    """Determina o fator de reserva da seção com armadura total fixa.
 
-    Retorna scipy OptimizeResult com success indicando residuos suficientemente
-    pequenos. lambda < 1 indica resistencia insuficiente no raio de carga.
+    Resolve o equilíbrio proporcional das três componentes de esforços,
+    minimizando os resíduos normalizados pelo método dos mínimos quadrados.
+
+    Args:
+        secao: Seção com ``area``, ``barras`` e método ``altura(alfa)``.
+            Cada barra deve ter área definida por ``proporcao``.
+        concreto: Modelo constitutivo do concreto.
+        aco: Modelo constitutivo do aço.
+        As (float): Área total de armadura, em mm².
+        Nsd (float): Força normal solicitante, em N.
+        Msdx (float): Momento solicitante em torno do eixo x, em N·mm.
+        Msdy (float): Momento solicitante em torno do eixo y, em N·mm.
+        x0 (float | None): Estimativa inicial da profundidade da linha
+            neutra, em mm. Se None, utiliza ``0.4 * secao.altura(0)``.
+        alfa0 (float): Estimativa inicial da orientação, em radianos.
+        lambda0 (float): Estimativa inicial do fator de reserva.
+        fator_x_max (float): Fator multiplicador da altura de referência
+            para estabelecer o limite superior de ``x``.
+        tolerancia_equilibrio (float): Limite da norma euclidiana dos
+            resíduos normalizados para aceitar o equilíbrio.
+        multiplas_tentativas (bool): Se True, testa também uma grade de
+            ângulos e profundidades iniciais.
+
+    Returns:
+        scipy.optimize.OptimizeResult: Resultado com atributos usuais
+        ``x`` (vetor ``[x, alfa, lambda]``), ``fun`` e ``message``, além de:
+
+            - ``otimizador_success``: critério de parada do SciPy.
+            - ``norma_residuos``: norma euclidiana dos resíduos escalados.
+            - ``success``: True se a norma satisfizer a tolerância.
+            - ``tentativas``: número de otimizações concluídas.
+
+    Raises:
+        ValueError: Se ``As`` não for positiva, não houver barras,
+            todas as solicitações forem nulas, houver áreas de barras
+            fixas ou as proporções não somarem 1.
+        RuntimeError: Se nenhuma tentativa de otimização produzir
+            resultado utilizável.
+
+    Notes:
+        Os resíduos são ``(R - lambda*S) / escala``. As escalas são
+        ``max(abs(Nsd), 1e5)`` para força e
+        ``max(abs(Msdx), abs(Msdy), 1e7)`` para cada momento.
+
+        Os limites numéricos são ``1e-6 <= x <= fator_x_max*h``,
+        ``-pi <= alfa <= pi`` e ``0 <= lambda <= 100``. As estimativas
+        iniciais são ajustadas para permanecer dentro desses limites.
+
+        A rotina redefine ``success`` com base apenas na norma dos
+        resíduos; portanto, esse atributo não equivale necessariamente
+        ao ``success`` original do SciPy. Consulte
+        ``otimizador_success`` para conhecer o critério de parada.
+        Uma solução com resíduos pequenos não substitui verificações
+        normativas ou análise de unicidade do estado resistente.
     """
     if As <= 0 or not secao.barras:
         raise ValueError('As deve ser positiva e deve haver barras.')
