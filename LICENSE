@@ -1,0 +1,67 @@
+LICENÇA DE USO ACADÊMICO RESTRITO — PYOBLIQUA
+Versão 1.0 — 2026
+
+Copyright (c) 2026 Felipe Quevedo. Todos os direitos reservados.
+
+1. OBJETO E FINALIDADE
+
+Esta licença regula o uso do software Pyobliqua e de seu código-fonte.
+O programa é disponibilizado exclusivamente para consulta, ensino,
+aprendizagem e pesquisa acadêmica não comercial.
+
+2. PERMISSÕES
+
+O titular concede, gratuitamente, permissão não exclusiva para:
+(a) acessar e consultar o código-fonte;
+(b) baixar, instalar e executar o programa para fins acadêmicos não comerciais;
+(c) estudar o funcionamento do programa e realizar modificações privadas
+    para fins de estudo ou experimentação, sem redistribuí-las;
+(d) utilizar resultados em atividades acadêmicas, com reconhecimento
+    da autoria do software e das referências técnicas pertinentes.
+
+3. RESTRIÇÕES
+
+Sem autorização prévia e expressa do titular, não é permitido:
+(a) utilizar o programa ou seu código em atividades comerciais;
+(b) vender, sublicenciar ou incorporar o programa a produtos ou serviços
+    comerciais;
+(c) distribuir ou publicar versões modificadas do programa;
+(d) utilizar o programa como ferramenta de dimensionamento ou verificação
+    de estruturas em projetos profissionais.
+
+A disponibilização pública do repositório não concede permissões além
+daquelas expressamente previstas nesta licença.
+
+4. ATRIBUIÇÃO E REFERÊNCIA
+
+Em publicações e trabalhos acadêmicos que utilizem o Pyobliqua, deve-se
+reconhecer a autoria do software. Quando pertinente, deve-se citar também:
+
+CAMPOS FILHO, Américo. Dimensionamento de seções poligonais de concreto
+armado à flexão composta oblíqua. Apostila, UFRGS, 2000.
+
+5. LIMITAÇÕES TÉCNICAS E AUSÊNCIA DE GARANTIAS
+
+O programa é fornecido NO ESTADO EM QUE SE ENCONTRA, sem garantias
+expressas ou implícitas de exatidão, adequação a finalidade específica,
+continuidade ou ausência de erros, nos limites permitidos pela legislação
+aplicável.
+
+Os resultados devem ser avaliados criticamente e verificados de forma
+independente. O programa não substitui a responsabilidade técnica de
+profissional habilitado nem a observância das normas técnicas vigentes.
+
+O desenvolvedor não assume responsabilidade por danos, perdas ou outras
+consequências decorrentes da utilização do programa, nos limites
+permitidos pela legislação aplicável.
+
+6. DIREITOS RESERVADOS
+
+Todos os direitos não expressamente concedidos permanecem reservados
+ao titular. Qualquer uso fora do escopo desta licença depende de
+autorização prévia e expressa.
+
+7. OBSERVAÇÃO
+
+Esta é uma licença acadêmica restritiva, não uma licença de software
+livre ou de código aberto. Seu texto não constitui parecer jurídico.
