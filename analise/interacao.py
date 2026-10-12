@@ -104,6 +104,9 @@ def calcular_diagrama_interacao(secao, concreto, aco, As, Nsd,
                                tolerancia_normal=1e-5, angulos=None):
     """Resolve Nr(x, alfa) = Nsd para diferentes orientações.
 
+    Os estados de deformação e a transição dos domínios 2-3 utilizam
+    epsilon_cu do concreto, conforme a formulação de 2014.
+
     Varre x desde tração quase uniforme até compressão quase uniforme,
     buscando TODAS as mudanças de sinal detectáveis da equação normal.
     Não conecta automaticamente ramos diferentes nem classifica segurança.
@@ -146,7 +149,7 @@ def calcular_diagrama_interacao(secao, concreto, aco, As, Nsd,
         # Inclui explicitamente transições entre domínios.
         x_min = -max(3.0 * h, 3.0 * d)
         x_max = 1000.0 * h
-        transicoes = [0.0, (0.0035 / 0.0135) * d, d, h]
+        transicoes = [0.0, (concreto.epsilon_cu / (0.010 + concreto.epsilon_cu)) * d, d, h]
         positivos = np.geomspace(max(1e-8 * h, 1e-8), x_max, n_profundidades + 1)
         negativos = -np.geomspace(max(1e-8 * h, 1e-8), -x_min, n_profundidades + 1)
         malha = np.unique(np.r_[negativos, 0.0, positivos, transicoes])
@@ -156,7 +159,7 @@ def calcular_diagrama_interacao(secao, concreto, aco, As, Nsd,
         def calcular(x):
             x = float(x)
             if x not in cache:
-                estado = EstadoDeformacao(secao, x, float(alfa))
+                estado = EstadoDeformacao(secao, x, float(alfa), concreto=concreto)
                 nr, mx, my = esforcos_resistentes(secao, estado, concreto, aco, area_total=As)
                 cache[x] = (float(nr), float(mx), float(my), estado.dominio)
             return cache[x]

@@ -183,8 +183,10 @@ def desenhar_diagramas_deformacoes_tensoes(ax, secao, estado, concreto):
     h = eta_max - eta_min
     etas = np.linspace(eta_min, eta_max, 180)
     deformacoes = np.array([estado.deformacao(float(eta)) for eta in etas])
-    # Limite de precisão numérica próximo ao patamar de -3,5‰.
-    tensoes = np.array([concreto.tensao(max(float(eps), -0.0035)) for eps in deformacoes])
+    # Limita apenas a representação gráfica à deformação última do material.
+    # A avaliação dos esforços resistentes permanece nos módulos de análise.
+    tensoes = np.array([concreto.tensao(max(float(eps), -concreto.epsilon_cu))
+                        for eps in deformacoes])
 
     def plotar_diagrama(indice, valores, cor, nome, unidade):
         # Baselines paralelas à normal da LN; valores plotados paralelos à LN.
@@ -472,7 +474,8 @@ class Interface(tk.Tk):
         aviso = (
             'O Pyobliqua foi desenvolvido com base na apostila '
             '“Dimensionamento de Seções Poligonais de Concreto Armado à '
-            'Flexão Composta Oblíqua”, de Américo Campos Filho (UFRGS, 2000).\n\n'
+            'Flexão Composta Oblíqua”, de Américo Campos Filho (UFRGS, 2000), '
+            'com atualização da formulação constitutiva conforme a apostila de 2014.\n\n'
             'O software destina-se exclusivamente ao uso acadêmico, didático '
             'e de pesquisa. Seus resultados não substituem a análise crítica '
             'por profissional habilitado nem a aplicação das normas técnicas '
@@ -925,7 +928,7 @@ class Interface(tk.Tk):
                 As_resultado = As
             sucesso = bool(r.success)
             if sucesso:
-                estado = EstadoDeformacao(secao, x, alfa)
+                estado = EstadoDeformacao(secao, x, alfa, concreto=concreto)
                 resistentes = esforcos_resistentes(secao, estado, concreto, aco,
                                                   area_total=As_resultado)
                 plot_esforcos = esforcos if modo == 'dimensionamento' else resistentes

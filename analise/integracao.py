@@ -7,7 +7,7 @@ integrais monomiais por meio do teorema de Green.
 Convenções:
     - Coordenadas ``xi`` e ``eta`` em mm.
     - Deformações ``epsilon`` adimensionais; compressão negativa.
-    - Transições do concreto em epsilon = 0 e epsilon = -0.002.
+    - Transições do concreto em epsilon = 0 e epsilon = -epsilon_c2.
     - Integrais orientadas: inverter os vértices inverte o sinal.
     - A integral de xi**p * eta**q tem unidade mm**(p + q + 2).
 
@@ -22,31 +22,46 @@ class RegiaoConcreto(Enum):
 
     Attributes:
         ZERO: Região sem tensão de concreto (epsilon >= 0).
-        PARABOLICA: Região comprimida com -0.002 <= epsilon < 0.
-        CONSTANTE: Região comprimida com epsilon < -0.002.
+        PARABOLICA: Região comprimida com -epsilon_c2 <= epsilon < 0.
+        CONSTANTE: Região comprimida com epsilon < -epsilon_c2.
     """
     ZERO = 0
     PARABOLICA = 1
     CONSTANTE = 2
     
-def identificar_regiao(epsilon: float) -> RegiaoConcreto:
+def _epsilon_c2(concreto=None, estado=None):
+    """Obtém a deformação de transição (positiva) do concreto.
+
+    Prioriza o argumento explícito ``concreto`` e, se ausente, usa
+    ``estado.concreto``. Sem ambos, mantém o limite clássico de 0,002.
+    """
+    if concreto is None and estado is not None:
+        concreto = getattr(estado, "concreto", None)
+    valor = 0.002 if concreto is None else float(concreto.epsilon_c2)
+    if not 0.0 < valor < float("inf"):
+        raise ValueError("epsilon_c2 deve ser positivo e finito.")
+    return valor
+
+
+def identificar_regiao(epsilon: float, concreto=None) -> RegiaoConcreto:
 
     """Classifica uma deformação no diagrama do concreto.
 
     Args:
         epsilon (float): Deformação específica adimensional.
+        concreto: Objeto com propriedade ``epsilon_c2`` (opcional).
 
     Returns:
         RegiaoConcreto: Região correspondente à deformação.
 
     Notes:
-        Não verifica o limite último de compressão de -0.0035;
+        Não verifica o limite último de compressão;
         apenas identifica o trecho constitutivo.
     """
     if epsilon >= 0.0:
         return RegiaoConcreto.ZERO
 
-    if epsilon >= -0.002:
+    if epsilon >= -_epsilon_c2(concreto):
         return RegiaoConcreto.PARABOLICA
 
     return RegiaoConcreto.CONSTANTE
@@ -93,7 +108,8 @@ def interpolar_ponto(
 def subdividir_segmento(
     p1,
     p2,
-    estado
+    estado,
+    concreto=None
 ):
 
     """Divide um segmento nos limites do diagrama do concreto.
@@ -102,13 +118,14 @@ def subdividir_segmento(
         p1 (tuple[float, float]): Ponto inicial (xi, eta), em mm.
         p2 (tuple[float, float]): Ponto final (xi, eta), em mm.
         estado: Estado de deformação com método ``deformacao(eta)``.
+        concreto: Modelo constitutivo opcional; prevalece sobre estado.concreto.
 
     Returns:
         list[tuple]: Segmentos (ponto_inicial, ponto_final, regiao),
         ordenados ao longo do segmento original.
 
     Notes:
-        Os cortes ocorrem em epsilon = 0 e epsilon = -0.002.
+        Os cortes ocorrem em epsilon = 0 e epsilon = -epsilon_c2.
         A região é determinada pela deformação no ponto médio.
     """
     epsilon1 = estado.deformacao(p1[1])
@@ -119,9 +136,10 @@ def subdividir_segmento(
         (1.0, p2)
     ]
 
+    epsilon_c2 = _epsilon_c2(concreto, estado)
     limites = [
         0.0,
-        -0.002
+        -epsilon_c2
     ]
 
     for epsilon_limite in limites:
@@ -169,7 +187,7 @@ def subdividir_segmento(
         )
 
         regiao = identificar_regiao(
-            epsilon_medio
+            epsilon_medio, concreto if concreto is not None else getattr(estado, "concreto", None)
         )
 
         segmentos.append(
@@ -181,7 +199,8 @@ def subdividir_segmento(
 def segmentos_rotacionados(
     secao,
     poligono,
-    estado
+    estado,
+    concreto=None
 ):
 
     """Converte e subdivide os lados de um polígono da seção.
@@ -221,7 +240,8 @@ def segmentos_rotacionados(
         novos_segmentos = subdividir_segmento(
             (xi1, eta1),
             (xi2, eta2),
-            estado
+            estado,
+            concreto=concreto
         )
 
         segmentos.extend(novos_segmentos)
@@ -351,7 +371,7 @@ def recortar_poligono(vertices, estado, limite, manter_menor=True):
 
     return resultado
 
-def separar_regioes(vertices, estado):
+def separar_regioes(vertices, estado, concreto=None):
     """Separa o polígono nas regiões comprimidas do concreto.
 
     Args:
@@ -360,14 +380,16 @@ def separar_regioes(vertices, estado):
 
     Returns:
         tuple[list[tuple], list[tuple]]: Polígonos das regiões
-        parabólica (-0.002 <= epsilon <= 0) e constante
-        (epsilon <= -0.002), respectivamente.
+        parabólica (-epsilon_c2 <= epsilon <= 0) e constante
+        (epsilon <= -epsilon_c2), respectivamente.
 
     Notes:
         Primeiro elimina a região tracionada (epsilon > 0).
         As fronteiras podem pertencer a ambas as regiões, sem
         produzir sobreposição de área.
     """
+
+    epsilon_c2 = _epsilon_c2(concreto, estado)
 
     # Região comprimida
     comprimida = recortar_poligono(
@@ -377,19 +399,19 @@ def separar_regioes(vertices, estado):
         manter_menor=True
     )
 
-    # Região I: -0.002 <= epsilon <= 0
+    # Região I: -epsilon_c2 <= epsilon <= 0
     regiao_I = recortar_poligono(
         comprimida,
         estado,
-        limite=-0.002,
+        limite=-epsilon_c2,
         manter_menor=False
     )
 
-    # Região II: epsilon <= -0.002
+    # Região II: epsilon <= -epsilon_c2
     regiao_II = recortar_poligono(
         comprimida,
         estado,
-        limite=-0.002,
+        limite=-epsilon_c2,
         manter_menor=True
     )
 
@@ -494,4 +516,30 @@ if __name__ == "__main__":
     else:
         raise AssertionError("Expoente negativo deveria gerar ValueError")
     print("Casos-limite: OK")
+
+    # Testes de transição variável (Campos Filho, 2014).
+    class ConcretoTeste:
+        def __init__(self, epsilon_c2):
+            self.epsilon_c2 = epsilon_c2
+
+    c60 = ConcretoTeste(0.002288)
+    c90 = ConcretoTeste(0.0026)
+    assert identificar_regiao(-0.0021, c60) == RegiaoConcreto.PARABOLICA
+    assert identificar_regiao(-0.0024, c60) == RegiaoConcreto.CONSTANTE
+    assert identificar_regiao(-0.0025, c90) == RegiaoConcreto.PARABOLICA
+    assert identificar_regiao(-0.0027, c90) == RegiaoConcreto.CONSTANTE
+    assert identificar_regiao(-0.0021) == RegiaoConcreto.CONSTANTE
+
+    class EstadoConcretoTeste(EstadoTeste):
+        concreto = c60
+
+    estado60 = EstadoConcretoTeste()
+    seg60 = subdividir_segmento((0, -1), (4, 3), estado60)
+    conferir(seg60[1][1][1], 2.288, "Transição C60 por estado.concreto")
+    regiao_i, regiao_ii = separar_regioes(retangulo, estado60)
+    conferir(integrar_poligono(regiao_i, 0, 0), 4.576, "Área região I C60")
+    conferir(integrar_poligono(regiao_ii, 0, 0), 1.424, "Área região II C60")
+    seg90 = subdividir_segmento((0, -1), (4, 3), estado, concreto=c90)
+    conferir(seg90[1][1][1], 2.6, "Transição C90 explícita")
+    print("Transições C60 e C90: OK")
     print("Todos os testes passaram!")

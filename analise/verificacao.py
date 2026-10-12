@@ -18,10 +18,6 @@ O método usa ``scipy.optimize.least_squares`` e múltiplas estimativas
 iniciais opcionais. Os limites de busca são numéricos, não verificações
 normativas independentes.
 """
-"""Verificacao no ELU por fator de reserva lambda.
-
-Unidades: mm, N, MPa, N.mm. Angulos em radianos.
-"""
 from math import pi
 import numpy as np
 from scipy.optimize import least_squares
@@ -64,7 +60,8 @@ def resolver_verificacao(secao, concreto, aco, As, Nsd, Msdx, Msdy,
 
             - ``otimizador_success``: critério de parada do SciPy.
             - ``norma_residuos``: norma euclidiana dos resíduos escalados.
-            - ``success``: True se a norma satisfizer a tolerância.
+            - ``success``: True se o otimizador convergir e a norma satisfizer a tolerância.
+             - ``equilibrio_atendido``: True se a norma satisfizer a tolerância.
             - ``tentativas``: número de otimizações concluídas.
 
     Raises:
@@ -83,10 +80,9 @@ def resolver_verificacao(secao, concreto, aco, As, Nsd, Msdx, Msdy,
         ``-pi <= alfa <= pi`` e ``0 <= lambda <= 100``. As estimativas
         iniciais são ajustadas para permanecer dentro desses limites.
 
-        A rotina redefine ``success`` com base apenas na norma dos
-        resíduos; portanto, esse atributo não equivale necessariamente
-        ao ``success`` original do SciPy. Consulte
-        ``otimizador_success`` para conhecer o critério de parada.
+        A rotina redefine ``success`` combinando o sucesso original
+        do SciPy e o atendimento à tolerância de equilíbrio. Consulte
+        ``otimizador_success`` para o critério de parada do SciPy.
         Uma solução com resíduos pequenos não substitui verificações
         normativas ou análise de unicidade do estado resistente.
     """
@@ -110,7 +106,7 @@ def resolver_verificacao(secao, concreto, aco, As, Nsd, Msdx, Msdy,
 
     def residuos(v):
         x, alfa, lam = v
-        estado = EstadoDeformacao(secao, x, alfa)
+        estado = EstadoDeformacao(secao, x, alfa, concreto)
         resistente = np.asarray(esforcos_resistentes(
             secao, estado, concreto, aco, area_total=As), dtype=float)
         return (resistente - lam*cargas)/escalas
@@ -131,7 +127,7 @@ def resolver_verificacao(secao, concreto, aco, As, Nsd, Msdx, Msdy,
                               x_scale=[h,1.0,1.0], max_nfev=1200,
                               ftol=1e-11, xtol=1e-11, gtol=1e-11)
             melhores.append(r)
-            if np.linalg.norm(r.fun) <= tolerancia_equilibrio:
+            if r.success and np.linalg.norm(r.fun) <= tolerancia_equilibrio:
                 break
         except (ValueError, FloatingPointError, ZeroDivisionError):
             continue
@@ -140,6 +136,7 @@ def resolver_verificacao(secao, concreto, aco, As, Nsd, Msdx, Msdy,
     melhor = min(melhores, key=lambda r: np.linalg.norm(r.fun))
     melhor.otimizador_success = bool(melhor.success)
     melhor.norma_residuos = float(np.linalg.norm(melhor.fun))
-    melhor.success = melhor.norma_residuos <= tolerancia_equilibrio
+    melhor.equilibrio_atendido = melhor.norma_residuos <= tolerancia_equilibrio
+    melhor.success = bool(melhor.otimizador_success and melhor.equilibrio_atendido)
     melhor.tentativas = len(melhores)
     return melhor

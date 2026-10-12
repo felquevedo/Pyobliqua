@@ -67,7 +67,8 @@ def residuos_equilibrio(
     estado = EstadoDeformacao(
         secao=secao,
         x=x,
-        alfa=alfa
+        alfa=alfa,
+        concreto=concreto
     )
 
     Nr, Mrx, Mry = esforcos_resistentes(
@@ -218,8 +219,9 @@ if __name__ == "__main__":
                 1e7 * area_total)
 
     class EstadoFicticio:
-        def __init__(self, secao, x, alfa):
+        def __init__(self, secao, x, alfa, concreto=None):
             self.x, self.alfa = x, alfa
+            self.concreto = concreto
 
     barras = [SimpleNamespace(area=None, proporcao=0.5),
               SimpleNamespace(area=None, proporcao=0.5)]
@@ -233,6 +235,12 @@ if __name__ == "__main__":
         residuo = residuos_equilibrio([2, 0.3, 4], *parametros)
         assert np.allclose(residuo, [0, 0, 0], atol=1e-12)
         print("Resíduos nulos na solução conhecida: OK")
+
+        # O estado deve receber o mesmo concreto usado no equilíbrio.
+        with patch(__name__ + ".EstadoDeformacao", wraps=EstadoFicticio) as construtor:
+            residuos_equilibrio([2, 0.3, 4], *parametros)
+            assert construtor.call_args.kwargs["concreto"] is concreto
+        print("Propagação do material concreto: OK")
 
         residuo = residuos_equilibrio([3, 0.4, 5], *parametros)
         assert np.allclose(residuo, [1, .025, .25], atol=1e-12)

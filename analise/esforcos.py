@@ -53,19 +53,15 @@ def esforcos_concreto(secao, estado, concreto):
     b = estado.b
     c = estado.c
 
-    eps_c2 = 0.002
+    # Aproximação quadrática da apostila de Campos Filho (2014):
+    # sigma = sigma_cd * (a2 * epsilon**2 + a1 * epsilon)
+    # com epsilon = b * eta + c.
+    a1 = concreto.a1
+    a2 = concreto.a2
 
-    D0 = sigma_cd * (
-        2 * c / eps_c2
-        + c**2 / eps_c2**2
-    )
-
-    D1 = sigma_cd * (
-        2 * b / eps_c2
-        + 2 * b * c / eps_c2**2
-    )
-
-    D2 = sigma_cd * b**2 / eps_c2**2
+    D0 = sigma_cd * (a2 * c**2 + a1 * c)
+    D1 = sigma_cd * (2.0 * a2 * b * c + a1 * b)
+    D2 = sigma_cd * a2 * b**2
 
     Nc = 0.0
     Mc_xi = 0.0
@@ -85,7 +81,7 @@ def esforcos_concreto(secao, estado, concreto):
         ]
 
         regiao_I, regiao_II = separar_regioes(
-            vertices, estado
+            vertices, estado, concreto
         )
 
         def GI(p, q):
@@ -291,6 +287,9 @@ if __name__ == "__main__":
 
     class ConcretoTeste:
         sigma_cd = 20.0
+        epsilon_c2 = 0.002
+        a1 = 1000.0
+        a2 = 250000.0
 
     class AcoTeste:
         def tensao(self, epsilon):
@@ -381,4 +380,21 @@ if __name__ == "__main__":
         conferir(mx_total - mx_conc, -2400, "Momento x invariante")
         conferir(my_total - my_conc, 1200, "Momento y invariante")
     print("Invariancia dos momentos globais: OK")
+    # Verificação independente da integração para concretos de alta resistência:
+    # estado uniforme no ramo quadrático => N = sigma(epsilon) * área.
+    from materiais.concreto import Concreto
+    for fck in (30.0, 60.0, 70.0, 80.0, 90.0):
+        material = Concreto(fck)
+        eps = -0.5 * material.epsilon_c2
+        estado_uniforme = SimpleNamespace(
+            b=0.0, c=eps, alfa=0.0,
+            deformacao=lambda eta, e=eps: e,
+        )
+        nc, mx, my = esforcos_concreto(secao, estado_uniforme, material)
+        conferir(nc, material.tensao(eps) * 8.0,
+                 f"Normal uniforme C{fck:g}")
+        conferir(mx, 0.0, f"Mx uniforme C{fck:g}")
+        conferir(my, 0.0, f"My uniforme C{fck:g}")
+    print("Aproximação quadrática C30 a C90: OK")
+
     print("Todos os testes passaram!")

@@ -11,7 +11,8 @@ Convenções:
     - Compressão negativa; tração positiva.
     - A profundidade ``x`` é medida desde a fibra superior.
 
-A formulação e os limites são os adotados pelo projeto original.
+Os limites são parametrizados pelo concreto (Campos Filho, 2014).
+    Sem informar concreto, são usados os limites tradicionais até C50.
 """
 
 class EstadoDeformacao:
@@ -38,7 +39,7 @@ class EstadoDeformacao:
         e ``epsilon_aco_inferior``.
     """
 
-    def __init__(self, secao, x, alfa):
+    def __init__(self, secao, x, alfa, concreto=None):
 
         """Inicializa o estado último de deformação da seção.
 
@@ -58,6 +59,14 @@ class EstadoDeformacao:
             do campo linear de deformações ``epsilon(eta) = b*eta + c``.
         """
         self.secao = secao
+        self.concreto = concreto
+        self.epsilon_c2 = (
+            min(concreto.epsilon_c2, concreto.epsilon_cu)
+            if concreto is not None else 0.002
+        )
+        self.epsilon_cu = (concreto.epsilon_cu if concreto is not None else 0.0035)
+        if not (0 < self.epsilon_c2 <= self.epsilon_cu):
+            raise ValueError("Limites de deformação do concreto inválidos.")
         self.x = float(x)
         self.alfa = float(alfa)
 
@@ -87,10 +96,10 @@ class EstadoDeformacao:
             str: Identificador ``"1-2"``, ``"3-4"``, ``"4a"`` ou ``"5"``.
 
         Notes:
-            Os limites são ``(0.0035/0.0135)*d``, ``d`` e ``h``.
+            Os limites são ``epsilon_cu/(0.010+epsilon_cu)*d``, ``d`` e ``h``.
             O rótulo ``"1-2"`` é usado também quando ``x <= 0``.
         """
-        if self.x <= (0.0035 / 0.0135) * self.d:
+        if self.x <= (self.epsilon_cu / (0.010 + self.epsilon_cu)) * self.d:
             return "1-2"
 
         if self.x <= self.d:
@@ -130,29 +139,29 @@ class EstadoDeformacao:
 
         elif self.dominio == "3-4":
 
-            epsilon_s = -0.0035
+            epsilon_s = -self.epsilon_cu
 
             epsilon_i = (
-                0.0035 * (d - x) / x
+                self.epsilon_cu * (d - x) / x
             )
 
         elif self.dominio == "4a":
 
-            epsilon_s = -0.0035
-            epsilon_i = -0.0035 * (x - h) / x
+            epsilon_s = -self.epsilon_cu
+            epsilon_i = -self.epsilon_cu * (x - h) / x
 
         else:
 
             denominador = (
-                x - (3.0 / 7.0) * h
+                x - (1.0 - self.epsilon_c2 / self.epsilon_cu) * h
             )
 
             epsilon_s = (
-                -0.002 * x / denominador
+                -self.epsilon_c2 * x / denominador
             )
 
             epsilon_i = (
-                -0.002
+                -self.epsilon_c2
                 * (x - h)
                 / denominador
             )
@@ -315,4 +324,18 @@ if __name__ == "__main__":
     conferir(estado.epsilon_aco_inferior,
              estado.deformacao(estado.eta_i_aco), "aço inferior")
     print("Propriedades e continuidade entre domínios: OK")
+    from materiais.concreto import Concreto
+    for fck in (30, 60, 70, 80, 90):
+        concreto = Concreto(fck)
+        limite = concreto.epsilon_cu / (0.010 + concreto.epsilon_cu) * secao.altura_util(0)
+        for x_t in (limite, secao.altura_util(0), secao.altura(0)):
+            antes = EstadoDeformacao(secao, x_t - 1e-6, 0, concreto)
+            depois = EstadoDeformacao(secao, x_t + 1e-6, 0, concreto)
+            assert isclose(antes.epsilon_s, depois.epsilon_s, abs_tol=1e-7)
+            assert isclose(antes.epsilon_aco_inferior, depois.epsilon_aco_inferior, abs_tol=1e-7)
+        estado_5 = EstadoDeformacao(secao, 2000, 0, concreto)
+        eta_pivo = estado_5.eta_s - (1.0 - concreto.epsilon_c2 / concreto.epsilon_cu) * estado_5.h
+        conferir(estado_5.deformacao(eta_pivo), -concreto.epsilon_c2, f"pivô domínio 5 C{fck}")
+        assert estado_5.dominio == "5"
+    print("Concretos C30 a C90 e continuidade: OK")
     print("Todos os testes passaram!")
