@@ -2,7 +2,8 @@
 
 Execute na raiz do projeto: python interface_pyobliqua.py
 Dependências: numpy, scipy, matplotlib; tkinter da instalação Python.
-Unidades de entrada: mm, MPa, kN, kN.m e mm².
+Unidades de entrada: cm, MPa, kN, kN.m e cm².
+Internamente os módulos de cálculo continuam usando mm e mm².
 """
 import json
 import webbrowser
@@ -11,6 +12,8 @@ import math
 import threading
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+from matplotlib.ticker import FuncFormatter
+import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
@@ -23,6 +26,8 @@ from analise.esforcos import esforcos_resistentes
 from analise.equilibrio import resolver_equilibrio
 from analise.verificacao import resolver_verificacao
 from visualizacao.desenho_secao import desenhar_secao
+from analise.interacao import calcular_diagrama_interacao, estimar_aproveitamento_radial
+from visualizacao.diagrama_interacao import desenhar_diagrama_interacao
 
 
 def numero(texto, descricao):
@@ -157,6 +162,77 @@ class Tabela(ttk.Frame):
         entrada.bind('<Escape>', lambda e: fechar(False))
 
 
+def desenhar_diagramas_deformacoes_tensoes(ax, secao, estado, concreto):
+    """Diagramas ao lado da seção, com eixo longitudinal normal à linha neutra.
+
+    O diagrama de tensões representa somente o concreto (tração desprezada).
+    Deformações negativas indicam compressão. Não modifica o cálculo.
+    """
+    import numpy as np
+    from math import sin, cos
+
+    alfa = estado.alfa
+    n = np.array([-sin(alfa), cos(alfa)])  # direção eta: normal à LN
+    t = np.array([cos(alfa), sin(alfa)])   # direção paralela à LN
+    pontos = np.array([(v.x, v.y) for v in secao.contorno.vertices], dtype=float)
+    origem = np.array([secao.xc, secao.yc], dtype=float)
+    proj_t = (pontos - origem) @ t
+    proj_n = (pontos - origem) @ n
+    eta_min, eta_max = float(min(proj_n)), float(max(proj_n))
+    dim = max(np.ptp(pontos[:, 0]), np.ptp(pontos[:, 1]), 1.0)
+    h = eta_max - eta_min
+    etas = np.linspace(eta_min, eta_max, 180)
+    deformacoes = np.array([estado.deformacao(float(eta)) for eta in etas])
+    # Limite de precisão numérica próximo ao patamar de -3,5‰.
+    tensoes = np.array([concreto.tensao(max(float(eps), -0.0035)) for eps in deformacoes])
+
+    def plotar_diagrama(indice, valores, cor, nome, unidade):
+        # Baselines paralelas à normal da LN; valores plotados paralelos à LN.
+        deslocamento = max(proj_t) + (0.27 + 0.69 * indice) * dim
+        base = origem + np.outer(etas, n) + deslocamento * t
+        maximo = max(float(np.max(np.abs(valores))), 1e-12)
+        amplitude = 0.43 * dim
+        perfil = base + np.outer(-valores / maximo * amplitude, t)
+        ax.plot(base[:, 0], base[:, 1], color='#64748b', lw=1.1, ls='--', zorder=13)
+        ax.plot(perfil[:, 0], perfil[:, 1], color=cor, lw=2, zorder=14)
+        ax.fill(np.r_[base[:, 0], perfil[::-1, 0]],
+                np.r_[base[:, 1], perfil[::-1, 1]], color=cor, alpha=.14, zorder=12)
+        for eta, valor in ((etas[0], valores[0]), (etas[-1], valores[-1])):
+            ponto = origem + eta * n + (deslocamento - valor / maximo * amplitude) * t
+            ax.annotate(f'{valor:+.2f} {unidade}', xy=ponto, xytext=(4, 4),
+                        textcoords='offset points', fontsize=7, color=cor, zorder=15)
+        cabecalho = origem + (eta_max + .13 * max(h, dim)) * n + deslocamento * t
+        ax.text(*cabecalho, nome, fontsize=9, color=cor, fontweight='bold',
+                ha='center', va='center', zorder=15)
+        return np.vstack([base, perfil, cabecalho])
+
+    # Destaca as deformações das armaduras extremas no perfil linear.
+    etas_barras = [(np.array([b.posicao.x, b.posicao.y]) - origem) @ n
+                   for b in secao.barras]
+    if etas_barras:
+        for titulo_barra, eta_barra, marcador in (
+            ('Armadura superior', max(etas_barras), 'o'),
+            ('Armadura inferior', min(etas_barras), 's'),
+        ):
+            eps_barra = estado.deformacao(float(eta_barra)) * 1000
+            max_eps = max(float(np.max(np.abs(deformacoes * 1000))), 1e-12)
+            deslocamento = max(proj_t) + .27 * dim
+            ponto = origem + eta_barra * n + (deslocamento - eps_barra / max_eps * .43 * dim) * t
+            ax.scatter([ponto[0]], [ponto[1]], marker=marcador, s=45,
+                       facecolor='white', edgecolor='#14532d', linewidth=1.6, zorder=20)
+            ax.annotate(f'{titulo_barra}: {eps_barra:+.3f} ‰', xy=ponto,
+                        xytext=(8, -12 if marcador == 'o' else 12),
+                        textcoords='offset points', fontsize=8, color='#14532d', zorder=21,
+                        bbox=dict(facecolor='white', alpha=.82, edgecolor='none', pad=1))
+
+    pts_eps = plotar_diagrama(0, deformacoes * 1000, '#15803d', 'Deformações', '‰')
+    pts_sig = plotar_diagrama(1, tensoes, '#b91c1c', 'Tensões no concreto', 'MPa')
+    conjunto = np.vstack([pontos, pts_eps, pts_sig])
+    borda = .16 * dim
+    ax.set_xlim(min(conjunto[:, 0]) - borda, max(conjunto[:, 0]) + borda)
+    ax.set_ylim(min(conjunto[:, 1]) - borda, max(conjunto[:, 1]) + borda)
+
+
 class Interface(tk.Tk):
     """Janela principal da aplicação Pyobliqua.
 
@@ -176,7 +252,10 @@ class Interface(tk.Tk):
         self.modo = tk.StringVar(value='dimensionamento')
         self.campos = {}
         self._ocupado = False
+        self.mostrar_diagramas = tk.BooleanVar(value=True)
+        self.mostrar_interacao = tk.BooleanVar(value=False)
         self._ultimo = None
+        self._ultimo_interacao = None
         self._montar()
         self._montar_menu()
         self.carregar_exemplo_51()
@@ -205,7 +284,9 @@ class Interface(tk.Tk):
         return {
             'formato': 'Pyobliqua-DAD',
             'versao': 1,
+            'unidades_geometria': 'cm',
             'modo': self.modo.get(),
+            'mostrar_interacao': self.mostrar_interacao.get(),
             'campos': {nome: var.get() for nome, var in self.campos.items()},
             'contorno': self.contorno.linhas(),
             'furos': self.furos.linhas(),
@@ -214,13 +295,31 @@ class Interface(tk.Tk):
 
     def _aplicar_entradas(self, dados):
         """Preenche os controles com entradas previamente verificadas."""
-        self.modo.set(dados['modo'])
+        self.modo.set('verificacao' if dados['modo'] == 'interacao' else dados['modo'])
+        self.mostrar_interacao.set(bool(dados.get('mostrar_interacao', dados['modo'] == 'interacao')))
         self.atualizar_modo()
         self._definir(**dados['campos'])
-        self._preencher(self.contorno, dados['contorno'])
-        self._preencher(self.furos, dados['furos'])
-        self._preencher(self.barras, dados['barras'])
+        # Arquivos antigos .dad (sem marcador) armazenavam mm e mm².
+        # Converte apenas na leitura; novos arquivos são salvos em cm e cm².
+        antigo = dados.get('unidades_geometria', 'mm') == 'mm'
+        def adaptar(linhas, indices, indice_area=None):
+            if not antigo:
+                return linhas
+            saida = []
+            for linha in linhas:
+                nova = list(linha)
+                for i in indices:
+                    nova[i] = f'{numero(nova[i], "coordenada") / 10:.12g}'
+                if indice_area is not None:
+                    nova[indice_area] = f'{numero(nova[indice_area], "área") / 100:.12g}'
+                saida.append(nova)
+            return saida
+        self._preencher(self.contorno, adaptar(dados['contorno'], (0, 1)))
+        self._preencher(self.furos, adaptar(dados['furos'], (1, 2)))
+        self._preencher(self.barras, adaptar(dados['barras'], (0, 1),
+                        2 if dados['modo'] != 'dimensionamento' else None))
         self._ultimo = None
+        self._ultimo_interacao = None
         self.eixo_figura.clear()
         self.canvas_figura.draw_idle()
         self._escrever('Dados de entrada carregados. Execute o cálculo para obter resultados.\n')
@@ -230,8 +329,10 @@ class Interface(tk.Tk):
         """Confere a estrutura do arquivo antes de modificar a interface."""
         if not isinstance(dados, dict) or dados.get('formato') != 'Pyobliqua-DAD' or dados.get('versao') != 1:
             raise ValueError('Arquivo .dad incompatível com o formato do Pyobliqua.')
-        if dados.get('modo') not in ('dimensionamento', 'verificacao'):
+        if dados.get('modo') not in ('dimensionamento', 'verificacao', 'interacao'):
             raise ValueError('Modo de análise inválido no arquivo.')
+        if dados.get('unidades_geometria', 'mm') not in ('mm', 'cm'):
+            raise ValueError('Unidades geométricas inválidas no arquivo.')
         campos = dados.get('campos')
         esperados = {'fck (MPa)', 'fyk (MPa)', 'Es (MPa)', 'γc', 'γs',
                      'Nad (kN)', 'Maxd (kN·m)', 'Mayd (kN·m)'}
@@ -260,6 +361,7 @@ class Interface(tk.Tk):
         for tabela in (self.contorno, self.furos, self.barras):
             tabela.limpar()
         self._ultimo = None
+        self._ultimo_interacao = None
         self.eixo_figura.clear()
         self.canvas_figura.draw_idle()
         self._escrever('Novo projeto. Preencha os dados de entrada.\n')
@@ -413,7 +515,7 @@ class Interface(tk.Tk):
         cabecalho = ttk.Frame(corpo)
         cabecalho.pack(fill='x')
         ttk.Label(cabecalho, text='Pyobliqua', font=('Arial', 17, 'bold')).pack(side='left')
-        ttk.Label(cabecalho, text='mm | MPa | kN | kN·m | mm²').pack(side='left', padx=12)
+        ttk.Label(cabecalho, text='cm | MPa | kN | kN·m | cm²').pack(side='left', padx=12)
         ttk.Button(cabecalho, text='Carregar exemplo 5.1', command=self.carregar_exemplo_51).pack(side='right', padx=3)
         ttk.Button(cabecalho, text='Carregar exemplo 5.2', command=self.carregar_exemplo_52).pack(side='right', padx=3)
 
@@ -453,15 +555,15 @@ class Interface(tk.Tk):
         tabelas.add(cont, text='Contorno externo')
         tabelas.add(fur, text='Furos')
         tabelas.add(arm, text='Armadura')
-        self.contorno = Tabela(cont, ('x (mm)', 'y (mm)'), altura=12)
+        self.contorno = Tabela(cont, ('x (cm)', 'y (cm)'), altura=12)
         self.contorno.pack(fill='both', expand=True)
         ttk.Label(cont, text='Não repita o primeiro vértice.', foreground='#555').pack(anchor='w')
-        self.furos = Tabela(fur, ('Furo nº', 'x (mm)', 'y (mm)'), altura=12,
+        self.furos = Tabela(fur, ('Furo nº', 'x (cm)', 'y (cm)'), altura=12,
                            larguras=[65, 100, 100])
         self.furos.pack(fill='both', expand=True)
         ttk.Label(fur, text='Use o mesmo número para os vértices de um furo.',
                   foreground='#555').pack(anchor='w')
-        self.barras = Tabela(arm, ('x (mm)', 'y (mm)', 'ρ ou As'), altura=12,
+        self.barras = Tabela(arm, ('x (cm)', 'y (cm)', 'ρ ou As'), altura=12,
                             larguras=[95, 95, 100])
         self.barras.pack(fill='both', expand=True)
         self.aviso_barras = ttk.Label(arm, text='', foreground='#555')
@@ -473,10 +575,17 @@ class Interface(tk.Tk):
         self.botao_calcular.pack(side='left', padx=2)
         ttk.Button(acoes, text='Visualizar seção', command=self.visualizar).pack(side='left', padx=2)
         ttk.Button(acoes, text='Salvar imagem...', command=self.salvar_imagem).pack(side='left', padx=2)
+        ttk.Checkbutton(acoes, text='Exibir diagramas', variable=self.mostrar_diagramas,
+                        command=self._atualizar_diagramas).pack(side='left', padx=(10, 2))
+        ttk.Checkbutton(acoes, text='Diagrama Mx–My', variable=self.mostrar_interacao,
+                        command=self._alternar_interacao).pack(side='left', padx=(10, 2))
         resultado = ttk.LabelFrame(esquerdo, text='Resultados', padding=4)
         resultado.pack(fill='both', expand=False)
-        self.saida = tk.Text(resultado, height=11, wrap='word', font=('Consolas', 9))
-        self.saida.pack(fill='both', expand=True)
+        self.saida = tk.Text(resultado, height=16, wrap='word', font=('Consolas', 9))
+        scroll_resultados = ttk.Scrollbar(resultado, orient='vertical', command=self.saida.yview)
+        self.saida.configure(yscrollcommand=scroll_resultados.set)
+        self.saida.pack(side='left', fill='both', expand=True)
+        scroll_resultados.pack(side='right', fill='y')
         self.status = tk.StringVar(value='Pronto.')
         ttk.Label(esquerdo, textvariable=self.status).pack(anchor='w', pady=3)
 
@@ -504,7 +613,7 @@ class Interface(tk.Tk):
         if self.modo.get() == 'dimensionamento':
             self.aviso_barras.configure(text='ρ = fração da área total; soma das proporções = 1.')
         else:
-            self.aviso_barras.configure(text='As individual de cada barra, em mm².')
+            self.aviso_barras.configure(text='As individual de cada barra, em cm².')
 
     def _definir(self, **kwargs):
         """Atribui valores aos campos identificados pelos seus rótulos.
@@ -540,13 +649,13 @@ class Interface(tk.Tk):
         self._definir(**{'fck (MPa)': 20, 'fyk (MPa)': 500, 'Es (MPa)': 210000,
                          'γc': 1.4, 'γs': 1.15, 'Nad (kN)': -200,
                          'Maxd (kN·m)': -500, 'Mayd (kN·m)': 500})
-        self._preencher(self.contorno, [(0, 0), (850, 0), (850, 850), (0, 850)])
-        self._preencher(self.furos, [(1, 300, 300), (1, 550, 300), (1, 550, 550), (1, 300, 550)])
+        self._preencher(self.contorno, [(0, 0), (85, 0), (85, 85), (0, 85)])
+        self._preencher(self.furos, [(1, 30, 30), (1, 55, 30), (1, 55, 55), (1, 30, 55)])
         coords = [(5,5),(20,5),(35,5),(50,5),(65,5),(80,5),
                   (5,20),(5,35),(5,50),(5,65),(5,80),
                   (80,20),(80,35),(80,50),(80,65),(80,80),
                   (20,80),(35,80),(50,80),(65,80)]
-        self._preencher(self.barras, [(x*10,y*10,0.05) for x,y in coords])
+        self._preencher(self.barras, [(x,y,0.05) for x,y in coords])
         self._escrever('Exemplo 5.1 carregado: dimensionamento, 20 barras, seção vazada.\n')
 
     def carregar_exemplo_52(self):
@@ -567,10 +676,10 @@ class Interface(tk.Tk):
                   (27.5,8),(32.5,8),(37.5,8),(42.5,8),
                   (32.5,11),(37.5,11),
                   (5,115),(20,115),(35,115),(50,115),(65,115)]
-        self._preencher(self.contorno, [(10*x,10*y) for x,y in vertices])
+        self._preencher(self.contorno, [(x,y) for x,y in vertices])
         self.furos.limpar()
-        self._preencher(self.barras, [(10*x,10*y,200) for x,y in coords])
-        self._escrever('Exemplo 5.2 carregado: verificação, As total = 3000 mm².\n')
+        self._preencher(self.barras, [(x,y,2) for x,y in coords])
+        self._escrever('Exemplo 5.2 carregado: verificação, As total = 30 cm².\n')
 
     def _escrever(self, texto):
         """Substitui o texto do painel de resultados.
@@ -629,6 +738,7 @@ class Interface(tk.Tk):
             if valores[chave] <= 0:
                 raise ValueError(f'{chave} deve ser positivo.')
         contorno = self._ler_linhas(self.contorno, 2, 'Contorno')
+        contorno = [[10*x, 10*y] for x, y in contorno]  # cm -> mm
         if len(contorno) < 3:
             raise ValueError('O contorno deve ter pelo menos três vértices.')
         furos = {}
@@ -636,11 +746,13 @@ class Interface(tk.Tk):
             numero_furo, x, y = linha
             if numero_furo <= 0 or not numero_furo.is_integer():
                 raise ValueError(f'Furos, linha {i}: número do furo deve ser inteiro positivo.')
-            furos.setdefault(int(numero_furo), []).append((x,y))
+            furos.setdefault(int(numero_furo), []).append((10*x, 10*y))
         for indice, vertices in furos.items():
             if len(vertices) < 3:
                 raise ValueError(f'Furo {indice}: são necessários pelo menos três vértices.')
         dados_barras = self._ler_linhas(self.barras, 3, 'Armadura')
+        dados_barras = [(10*x, 10*y, a if self.modo.get() == 'dimensionamento' else 100*a)
+                        for x, y, a in dados_barras]  # cm -> mm; cm² -> mm²
         if not dados_barras:
             raise ValueError('Informe pelo menos uma barra de armadura.')
         if any(a <= 0 for _,_,a in dados_barras):
@@ -665,7 +777,27 @@ class Interface(tk.Tk):
                     valores['Mayd (kN·m)']*1e6)
         return secao, concreto, aco, esforcos, As, modo
 
-    def _desenhar(self, secao, As, estado, esforcos, tipo, titulo, salvar_em=None):
+    def _atualizar_diagramas(self):
+        """Redesenha a última seção sem executar novamente o cálculo."""
+        self._mostrar_ultima_visualizacao()
+
+    def _mostrar_ultima_visualizacao(self):
+        """Alterna entre a seção e a interação já calculadas."""
+        if self.mostrar_interacao.get() and self._ultimo_interacao is not None:
+            self._desenhar_interacao(*self._ultimo_interacao)
+        elif self._ultimo is not None:
+            self._desenhar(*self._ultimo)
+
+    def _alternar_interacao(self):
+        """Ativa a curva; se ainda não existe, recalcula o estado resistente."""
+        if self._ocupado:
+            return
+        if self.mostrar_interacao.get() and self._ultimo_interacao is None:
+            self.calcular()
+        else:
+            self._mostrar_ultima_visualizacao()
+
+    def _desenhar(self, secao, As, estado, esforcos, tipo, titulo, concreto=None, salvar_em=None):
         """Atualiza a visualização da seção no eixo Matplotlib embutido.
     
             Args:
@@ -682,6 +814,23 @@ class Interface(tk.Tk):
         desenhar_secao(secao, area_total=As, estado=estado, esforcos=esforcos,
                        tipo_esforcos=tipo, titulo=titulo, salvar_em=salvar_em,
                        numerar_barras=True, ax=self.eixo_figura, mostrar=False)
+        if self.mostrar_diagramas.get() and estado is not None and concreto is not None:
+            desenhar_diagramas_deformacoes_tensoes(self.eixo_figura, secao, estado, concreto)
+        # Coloca a legenda fora da área de dados, evitando cobrir a seção.
+        legenda = self.eixo_figura.get_legend()
+        if legenda is not None:
+            alcas, rotulos = self.eixo_figura.get_legend_handles_labels()
+            legenda.remove()
+            if alcas:
+                self.eixo_figura.legend(alcas, rotulos, loc='upper center',
+                    bbox_to_anchor=(0.5, -0.09), ncol=2, fontsize=8,
+                    frameon=True, borderaxespad=0.4)
+        # Apenas os rótulos dos eixos mudam: o desenho permanece em mm.
+        self.eixo_figura.xaxis.set_major_formatter(FuncFormatter(lambda valor, _: f'{valor/10:g}'))
+        self.eixo_figura.yaxis.set_major_formatter(FuncFormatter(lambda valor, _: f'{valor/10:g}'))
+        self.eixo_figura.set_xlabel('x (cm)')
+        self.eixo_figura.set_ylabel('y (cm)')
+        self.figura.subplots_adjust(bottom=0.23)
         self.canvas_figura.draw_idle()
 
     def visualizar(self):
@@ -692,7 +841,8 @@ class Interface(tk.Tk):
         """
         try:
             secao, _, _, esforcos, As, modo = self._dados()
-            self._ultimo = (secao, As, None, esforcos, 'solicitantes', 'Geometria e esforços solicitantes')
+            self._ultimo_interacao = None
+            self._ultimo = (secao, As, None, esforcos, 'solicitantes', 'Geometria e esforços solicitantes', None)
             self._desenhar(*self._ultimo)
         except Exception as exc:
             messagebox.showerror('Dados inválidos', str(exc))
@@ -700,7 +850,7 @@ class Interface(tk.Tk):
     def salvar_imagem(self):
         """Salva a figura atual em PNG ou PDF após escolha do caminho.
         """
-        if self._ultimo is None:
+        if self._ultimo is None and self._ultimo_interacao is None:
             messagebox.showinfo('Imagem', 'Calcule ou visualize a seção antes de salvar.')
             return
         caminho = filedialog.asksaveasfilename(defaultextension='.png',
@@ -773,17 +923,30 @@ class Interface(tk.Tk):
                 plot_esforcos = esforcos if modo == 'dimensionamento' else None
                 tipo = 'solicitantes' if modo == 'dimensionamento' else 'resistentes'
                 titulo = 'NÃO HOUVE CONVERGÊNCIA'
-            linhas = [f'Modo: {modo}', f'Convergência: {"SIM" if sucesso else "NÃO"}',
-                      f'Área geométrica: {secao.area:.3f} mm²',
-                      f'Centroide: ({secao.xc:.3f}; {secao.yc:.3f}) mm',
-                      f'Número de barras: {len(secao.barras)}']
+            linhas = [
+                f'Modo: {modo}',
+                f'Convergência: {"SIM" if sucesso else "NÃO"}',
+                '',
+                'PROPRIEDADES GEOMÉTRICAS',
+                f'Área geométrica: {secao.area/100:.3f} cm²',
+                f'Centroide: xc = {secao.xc/10:.3f} cm; yc = {secao.yc/10:.3f} cm',
+                f'Ix central = {secao.Ix/1e4:.6e} cm⁴',
+                f'Iy central = {secao.Iy/1e4:.6e} cm⁴',
+                f'Ixy central = {secao.Ixy/1e4:.6e} cm⁴',
+                f'Número de barras: {len(secao.barras)}',
+            ]
             if sucesso:
-                linhas.extend([f'x = {x:.6f} mm', f'α = {math.degrees(alfa):.6f}°',
-                               f'As total = {As_resultado:.6f} mm² ({As_resultado/100:.6f} cm²)'])
+                linhas.extend([f'x = {x/10:.6f} cm', f'α = {math.degrees(alfa):.6f}°',
+                               f'As total = {As_resultado/100:.6f} cm²'])
+                etas_barras = [secao.coordenadas_rotacionadas(barra.posicao, alfa)[1]
+                               for barra in secao.barras]
                 linhas.extend([
-                    f'ε superior (fibra superior da seção) = {estado.epsilon_s*1000:+.6f} ‰',
-                    f'ε inferior (fibra inferior da seção) = {estado.epsilon_concreto_inferior*1000:+.6f} ‰',
-                    f'Domínio de deformação = {estado.dominio}',
+                    '', 'DEFORMAÇÕES LONGITUDINAIS (‰)',
+                    f'Fibra superior do concreto: {estado.epsilon_s*1000:+.6f}',
+                    f'Armadura superior: {estado.deformacao(max(etas_barras))*1000:+.6f}',
+                    f'Armadura inferior: {estado.deformacao(min(etas_barras))*1000:+.6f}',
+                    f'Fibra inferior do concreto: {estado.epsilon_concreto_inferior*1000:+.6f}',
+                    f'Domínio de deformação: {estado.dominio}',
                 ])
                 if lam is not None:
                     linhas.append(f'λ = {lam:.8f} — {"reserva inferior a 1" if lam < 1 else "reserva não inferior a 1"}')
@@ -793,15 +956,104 @@ class Interface(tk.Tk):
             else:
                 linhas.append('Sem linha neutra nem esforços resistentes validados.')
             linhas.append(f'Norma dos resíduos = {getattr(r,"norma_residuos",float("nan")):.3e}')
-            self.after(0, lambda: self._finalizar('\n'.join(linhas),
-                    (secao, As_resultado if sucesso else As, estado, plot_esforcos, tipo, titulo)))
+            desenho = (secao, As_resultado if sucesso else As, estado,
+                       plot_esforcos, tipo, titulo, concreto)
+            if sucesso and self.mostrar_interacao.get():
+                try:
+                    curva = calcular_diagrama_interacao(
+                        secao, concreto, aco, As=As_resultado, Nsd=N,
+                        n_angulos=72, n_profundidades=100)
+                    self.after(0, lambda: self._finalizar_com_interacao(
+                        '\n'.join(linhas), desenho, curva, esforcos, As_resultado))
+                except Exception as exc:
+                    aviso = f'\n\nDiagrama Mx–My não calculado: {exc}'
+                    self.after(0, lambda: self._finalizar('\n'.join(linhas)+aviso, desenho))
+            else:
+                self.after(0, lambda: self._finalizar('\n'.join(linhas), desenho))
         except Exception as exc:
             erro = str(exc)
             # Se o cálculo falhar, ainda apresentar geometria e armadura.
             tipo = 'solicitantes' if modo == 'dimensionamento' else 'resistentes'
             plot_esforcos = esforcos if modo == 'dimensionamento' else None
             self.after(0, lambda: self._finalizar('NÃO HOUVE CONVERGÊNCIA\n'+erro,
-                    (secao, As, None, plot_esforcos, tipo, 'NÃO HOUVE CONVERGÊNCIA')))
+                    (secao, As, None, plot_esforcos, tipo, 'NÃO HOUVE CONVERGÊNCIA', None)))
+
+
+    def _finalizar_com_interacao(self, texto, desenho, resultado, esforcos, As):
+        """Mantém o resultado principal e a curva para alternância pelo checkbox."""
+        self._finalizar(texto, desenho)
+        self._ultimo_interacao = (resultado, esforcos, As)
+        self._mostrar_ultima_visualizacao()
+
+    def _calcular_interacao_worker(self, secao, concreto, aco, esforcos, As):
+        """Calcula estados resistentes usando exclusivamente analise.interacao."""
+        try:
+            resultado = calcular_diagrama_interacao(
+                secao, concreto, aco, As=As, Nsd=esforcos[0],
+                n_angulos=72, n_profundidades=100)
+            self.after(0, lambda: self._finalizar_interacao(
+                resultado, esforcos, As, secao))
+        except Exception as exc:
+            erro = str(exc)
+            self.after(0, lambda: self._finalizar_erro_interacao(erro))
+
+    def _desenhar_interacao(self, resultado, esforcos, As):
+        """Delega a visualização ao módulo visualizacao.diagrama_interacao."""
+        estimativa = estimar_aproveitamento_radial(resultado, esforcos[1], esforcos[2])
+        desenhar_diagrama_interacao(
+            self.eixo_figura, resultado,
+            momento_solicitante=(esforcos[1], esforcos[2]),
+            aproveitamento=estimativa)
+        self.figura.subplots_adjust(bottom=.22)
+        self.canvas_figura.draw_idle()
+
+    def _finalizar_interacao(self, resultado, esforcos, As, secao):
+        self._ocupado = False
+        self.botao_calcular.configure(state='normal')
+        n_pontos = len(resultado.pontos)
+        self.status.set('Diagrama calculado.' if n_pontos else 'Nenhum estado encontrado.')
+        linhas = [
+            'DIAGRAMA DE INTERAÇÃO Mx–My',
+            f'N fixo = {esforcos[0]/1e3:+.3f} kN',
+            f'As total = {As/100:.3f} cm²',
+            f'Mx solicitante = {esforcos[1]/1e6:+.3f} kN·m',
+            f'My solicitante = {esforcos[2]/1e6:+.3f} kN·m',
+            f'Área geométrica = {secao.area/100:.3f} cm²',
+            f'Centroide = ({secao.xc/10:.3f}; {secao.yc/10:.3f}) cm',
+            f'Estados resistentes encontrados = {n_pontos}',
+            f'Orientações sem raiz detectada = {len(resultado.angulos_sem_solucao)}',
+            '',
+            'ESTIMATIVA RADIAL (INTERPOLAÇÃO)',
+        ]
+        estimativa = estimar_aproveitamento_radial(resultado, esforcos[1], esforcos[2])
+        if estimativa.confiavel_para_interpolacao:
+            linhas.extend([
+                f'λ estimado = {estimativa.lambda_estimado:.6f}',
+                f'Mrx interpolado = {estimativa.Mx_resistente/1e6:+.3f} kN·m',
+                f'Mry interpolado = {estimativa.My_resistente/1e6:+.3f} kN·m',
+            ])
+        else:
+            linhas.append('λ não determinado pela interpolação radial.')
+        linhas.extend([
+            estimativa.observacao,
+            '',
+            'ATENÇÃO: pontos de equilíbrio normal amostrados.',
+            'O gráfico não é uma envoltória resistente certificada.',
+            'A posição da solicitação não comprova segurança estrutural.',
+        ])
+        if not n_pontos:
+            linhas.append('Nenhuma raiz encontrada; tente ampliar a busca numérica.')
+        self._escrever('\n'.join(linhas))
+        self._ultimo = None
+        self._ultimo_interacao = (resultado, esforcos, As)
+        self._desenhar_interacao(*self._ultimo_interacao)
+
+    def _finalizar_erro_interacao(self, erro):
+        self._ocupado = False
+        self.botao_calcular.configure(state='normal')
+        self.status.set('Erro no diagrama de interação.')
+        self._escrever('Erro ao calcular o diagrama Mx–My:\n' + erro)
+        self._ultimo_interacao = None
 
     def _finalizar(self, texto, desenho):
         """Reativa os controles e apresenta os resultados do cálculo.
@@ -819,6 +1071,7 @@ class Interface(tk.Tk):
         self.status.set('Cálculo concluído.')
         self._escrever(texto)
         self._ultimo = desenho
+        self._ultimo_interacao = None
         try:
             self._desenhar(*desenho)
         except Exception as exc:
