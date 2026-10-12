@@ -414,11 +414,7 @@ class Interface(tk.Tk):
         self.destroy()
 
     def mostrar_sobre(self):
-        """Exibe informações do programa, logotipo e área de mensagem multilinha.
-
-        O logotipo é carregado de ``logo_ufrgs.png`` ao lado do script,
-        quando disponível. A caixa de texto permite escrever várias linhas.
-        """
+        """Exibe informações, logotipo e aviso acadêmico somente para leitura."""
         if getattr(self, '_janela_sobre', None) is not None:
             try:
                 if self._janela_sobre.winfo_exists():
@@ -433,7 +429,7 @@ class Interface(tk.Tk):
         janela.title('Sobre')
         janela.resizable(False, False)
         janela.transient(self)
-        janela.geometry('720x360')
+        janela.geometry('760x430')
 
         conteudo = ttk.Frame(janela, padding=20)
         conteudo.pack(fill='both', expand=True)
@@ -473,8 +469,25 @@ class Interface(tk.Tk):
         link.bind('<Button-1>', lambda evento: webbrowser.open(f'mailto:{email}'))
 
         ttk.Label(informacoes, text='Mensagem:').pack(anchor='w')
-        self.mensagem_sobre = tk.Text(informacoes, height=6, wrap='word',
-                                      font=('Arial', 10))
+        aviso = (
+            'O Pyobliqua foi desenvolvido com base na apostila '
+            '“Dimensionamento de Seções Poligonais de Concreto Armado à '
+            'Flexão Composta Oblíqua”, de Américo Campos Filho (UFRGS, 2000).\n\n'
+            'O software destina-se exclusivamente ao uso acadêmico, didático '
+            'e de pesquisa. Seus resultados não substituem a análise crítica '
+            'por profissional habilitado nem a aplicação das normas técnicas '
+            'vigentes.\n\n'
+            'O desenvolvedor não se responsabiliza por decisões de projeto, '
+            'erros, danos ou prejuízos decorrentes da utilização do programa '
+            'ou de seus resultados.'
+        )
+        self.mensagem_sobre = tk.Text(
+            informacoes, height=10, wrap='word', font=('Arial', 10),
+            relief='flat', background=janela.cget('background'),
+            padx=2, pady=2, cursor='arrow', takefocus=0,
+        )
+        self.mensagem_sobre.insert('1.0', aviso)
+        self.mensagem_sobre.configure(state='disabled')
         self.mensagem_sobre.pack(fill='both', expand=True, pady=(4, 0))
 
         ttk.Button(conteudo, text='Fechar', command=janela.destroy).pack(
