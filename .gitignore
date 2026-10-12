@@ -1,0 +1,44 @@
+# Python: arquivos compilados e caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# Pacotes e distribuições
+build/
+dist/
+*.egg-info/
+
+# Configurações locais e segredos
+.env
+.env.*
+!.env.example
+*.log
+
+# Arquivos temporários e backups
+*.tmp
+*.bak
+*~
+*.swp
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Configurações pessoais de IDE
+.idea/
+.vscode/
+
+# Não ignorar arquivos .dad de exemplos: podem ser versionados.
+# Não ignorar logo_ufrgs.png nem documentação.

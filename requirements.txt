@@ -1,0 +1,7 @@
+# Dependências externas do Pyobliqua
+# Instalação: python -m pip install -r requirements.txt
+numpy
+scipy
+matplotlib
+
+# tkinter faz parte da distribuição padrão do Python no Windows.
