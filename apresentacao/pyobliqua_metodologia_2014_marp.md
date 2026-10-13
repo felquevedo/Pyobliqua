@@ -23,25 +23,12 @@ UFRGS | Engenharia Civil
 
 Ao final dessa aula você deve conseguir:
 
+- identificar o que é a flexão composta
 - explicar como $x$ e $\alpha$ definem o campo de deformações;
 - relacionar deformações, tensões e esforços resistentes;
 - distinguir dimensionamento de verificação;
 - reconhecer o papel do `least_squares` no Pyobliqua;
 - interpretar resultados sem confundir convergência com validação.
-
----
-
-## Sequência do cálculo
-
-O processo de cálculo da flexão composta oblíqua, segue o seguinte roteiro de cálculo:
-
-$$
-\textbf{geometria} \longrightarrow \textbf{deformações} \longrightarrow
-\textbf{tensões} \longrightarrow \textbf{esforços resistentes}
-\longrightarrow \textbf{equilíbrio}
-$$
-
-> Cada etapa usa a saída da anterior. O solver atua no final, ajustando as incógnitas do problema para reduzir o desequilíbrio entre solicitações de cálculo e resistências de cálculo.
 
 ---
 
@@ -73,19 +60,33 @@ A análise precisa encontrar a profundidade $x$ e a inclinação $\alpha$ compat
 
 ---
 
+## Sequência do cálculo
+
+O processo de cálculo (dimensionamento ou verificação) de seções submetidas à flexão composta oblíqua, segue o seguinte roteiro de cálculo:
+
+$$
+\textbf{geometria} \longrightarrow \textbf{deformações} \longrightarrow
+\textbf{tensões} \longrightarrow \textbf{esforços resistentes}
+\longrightarrow \textbf{equilíbrio}
+$$
+
+> Cada etapa usa a saída da anterior. O solver atua no final, ajustando as incógnitas do problema para reduzir o desequilíbrio entre solicitações de cálculo e resistências de cálculo.
+
+---
+
 ## Geometria poligonal
 
 <div class="duas-colunas">
 
 <div>
 
-Para se ter generalidade, a seção é representada por contornos fechados:
+Para se ter generalidade, a seção de concreto armado é representada por uma poligonal fechada:
 
 - o contorno externo é orientado no sentido anti-horário;
 - os contornos dos furos são orientados no sentido horário;
-- cada barra tem posição sua área $A_s$ em caso de o dimensionamento ou uma fração da área total $\rho$ em caso de verificação.
+- cada barra tem sua posição, sua área $A_s$ em caso de o dimensionamento, ou uma fração da área total $\rho$ em caso de verificação.
 
-A representação por contornos permite tratar seções vazadas e assimétricas sem mudar a formulação resistente.
+Essa representação é adequada para a técnica de integração de Green que permite calcular os esforços resistentetes do concreto transformando integral de área em integrais de contorno.
 
 </div>
 
@@ -97,19 +98,19 @@ A representação por contornos permite tratar seções vazadas e assimétricas 
 
 ---
 
-## Sistema global $(X,Y)$ e sistema local $(x,y)$
+## Sistema global e Sistema centroidal
 
 <div class="duas-colunas">
 
 <div>
 
-As coordenadas geométricas definem a seção no sistema global $(X,Y)$. Calculam-se área e centroide e transfere-se a origem para o centroide:
+As coordenadas geométricas definem a seção no sistema global $(X,Y)$. Calculam-se área e centroide e transfere-se a origem do sistema para o centroide da seção:
 
 $$
 x=X-X_C, \qquad y=Y-Y_C
 $$
 
-Os esforços resistentes são então referidos aos eixos centroidais locais. Manter a convenção de eixos e sinais consistente é essencial para comparar solicitação e resistência.
+Os esforços resistentes $N_{R}$, $M_{Rx}$, $M_{Ry}$ são então referidos aos eixos centroidais locais e comprados com as solicitações atuantes de cálculo $N_{Ad}$, $M_{Axd}$ e $M_{Ayd}$.
 
 </div>
 
@@ -200,7 +201,7 @@ Os domínios representam configurações-limite de deformação da seção:
 
 ---
 
-Os limites de $x$, $\varepsilon_s$ e $\varepsilon_i$ dependem de $d$, $h$, $\varepsilon_{c2}$ e $\varepsilon_{cu}$.
+Os limites de $x$, $\varepsilon_s$ e $\varepsilon_i$ dependem de $d$, $h$, $\varepsilon_{c2}$ (deformação do ínicio do patamar plástico do concreto) e $\varepsilon_{cu}$ (deformação última do concreto, associado à ruptura). A Tabela 1 abaixo mostra os limites de cada domínio de deformação:
 
 ![alt text](image-5.png)
 
@@ -210,9 +211,7 @@ Os limites de $x$, $\varepsilon_s$ e $\varepsilon_i$ dependem de $d$, $h$, $\var
 
 <div>
 
-Para cada orientação $\alpha$, a geometria fornece as fibras extremas e a altura útil $d$. A Tabela 2.1 relaciona $x$ às deformações-limite em cada domínio.
-
-Os domínios 1–2, 4a e 5 usam relações próprias, também apresentadas na Tabela 2.1.
+Dessa forma, para cada orientação $\alpha$, a geometria fornece as coordenadas $\eta$ das fibras extremas e a altura útil $d$ da armadura. A Tabela 1 relaciona $x$ às deformações-limite em cada domínio.
 
 **Exemplo nos domínios 3–4**, com compressão negativa:
 
@@ -236,7 +235,7 @@ $$
 
 ---
 
-Conhecidas as deformações nos pontos extremos $(\eta_s,\varepsilon_s)$ e $(\eta_i,\varepsilon_i)$:
+Conhecidas as deformações nos pontos extremos $(\eta_s,\varepsilon_s)$ e $(\eta_i,\varepsilon_i)$, tem-se:
 
 $$
 b=\frac{\varepsilon_s-\varepsilon_i}{\eta_s-\eta_i}, \qquad
@@ -249,17 +248,17 @@ $$
 \varepsilon_P=b\eta_P+c
 $$
 
-Essa etapa é a compatibilidade cinemática que conecta a posição da linha neutra à resposta dos materiais.
+Essa etapa é a compatibilidade cinemática que conecta a posição da linha neutra à deformação em qualquer ponto da seção.
 
 ---
 
-## Concreto no ELU
+## Lei Constitutiva do Concreto
 
 <div class="duas-colunas">
 
 <div>
 
-A resistência à tração do concreto é desprezada. Adota-se compressão negativa e a lei parábola-retângulo. A expressão usa os limites $\varepsilon_{c2}$ e $\varepsilon_{cu}$ e os coeficientes $a_1$ e $a_2$.
+Nessa formulação, a resistência à tração do concreto é desprezada. Adota-se o sentido da compressão negativa e a lei parábola-retângulo. A expressão usa os limites $\varepsilon_{c2}$ e $\varepsilon_{cu}$ e os coeficientes $a_1$ e $a_2$ de modo que:
 
 $$
 \sigma_c(\varepsilon)=
@@ -274,7 +273,7 @@ $$
 f_{cd}=\frac{f_{ck}}{\gamma_c}, \qquad \sigma_{cd}=0{,}85f_{cd}
 $$
 
-Os coeficientes $a_1$ e $a_2$ aproximam o diagrama do concreto por uma parábola, dessa forma, mantém-se o esquema de integração.
+Os coeficientes $a_1$ e $a_2$ aproximam o diagrama do concreto por uma parábola. Esse aspecto facilita a integração.
 
 </div>
 
@@ -292,7 +291,7 @@ Os coeficientes $a_1$ e $a_2$ aproximam o diagrama do concreto por uma parábola
 
 <div>
 
-A tabela abaixo mostra os coeficientes que aproximam o trecho parabólico.
+A Tabela abaixo mostra os coeficientes que aproximam o trecho parabólico.
 
 | Classe | $a_2$ | $a_1$ |
 |---:|---:|---:|
@@ -327,7 +326,7 @@ $$
 
 <div>
 
-As deformações limites para **Concretos até C50**:
+São adotadas as seguintes deformações limites para **Concretos até C50**:
 
 $$
 \varepsilon_{c2}=2{,}0\,‰, \qquad \varepsilon_{cu}=3{,}5\,‰
@@ -343,6 +342,8 @@ $$
 \varepsilon_{cu}=2{,}6\,‰+35\,‰\left(\frac{90-f_{ck}}{100}\right)^4
 $$
 
+Importante notar que nessas fórmulas é necessário utilizar a resistência em MPa.
+
 </div>
 
 <div>
@@ -355,15 +356,15 @@ $$
 
 ---
 
-## Aço da armadura
+## Lei Constitutiva da Armadura
 
 <div class="duas-colunas">
 
 <div>
 
-Para cada barra, calcula-se a deformação no seu ponto. A lei constitutiva bilinear usa a tensão de escoamento de cálculo e a deformação correspondente.
+Para cada barra, calcula-se a deformação no seu ponto. E para obter as tensões, é utilizado a lei constitutiva bilinear definida por uma tensão de escoamento de cálculo, uma deformação no escoamento e deformação última. 
 
-Cada barra contribui com tensão e área. No dimensionamento, a área de cada barra pode ser representada como fração da área total $A_s$.
+Cada barra contribui com tensão e área. No dimensionamento, busca-se a fração da área total $A_s$ referente a barra.
 
 $$
 f_{yd}=\frac{f_{yk}}{\gamma_s}, \qquad
@@ -390,7 +391,7 @@ $$
 
 ---
 
-## Regiões de integração do concreto
+## Regiões de integração das tensões do Concreto
 
 <div class="duas-colunas">
 
@@ -399,12 +400,12 @@ $$
 O campo de deformações divide a seção em três regiões:
 
 | Região | Faixa de deformação | Contribuição |
-|---|---|---|
+| :---: | :---: | --- |
 | 0 | $\varepsilon\geq0$ | Concreto sem tensão resistente |
 | I | $-\varepsilon_{c2}\leq\varepsilon<0$ | Tensão parabólica |
 | II | $-\varepsilon_{cu}\leq\varepsilon< -\varepsilon_{c2}$ | Tensão constante |
 
-Os contornos são recortados nas transições $\varepsilon=0$ e $\varepsilon=-\varepsilon_{c2}$. Isso permite integrar cada lei na região geométrica correta.
+Os contornos são recortados nas transições $\varepsilon=0$ e $\varepsilon=-\varepsilon_{c2}$. Isso permite integrar cada lei na sua correspondente região.
 
 </div>
 
@@ -416,15 +417,15 @@ Os contornos são recortados nas transições $\varepsilon=0$ e $\varepsilon=-\v
 
 ---
 
-## Integração pelo teorema de Green
+## Integração pelo Teorema de Green
 
 <div class="duas-colunas">
 
 <div>
 
-As integrais de área são convertidas em integrais de contorno. Cada aresta do polígono é reta, então sua contribuição pode ser calculada analiticamente.
+As integrais de área são convertidas em integrais de contorno. Cada aresta do polígono é uma reta, o que facilita a integração podendo ser calculada analíticamente.
 
-As contribuições do contorno externo e dos furos são somadas com sinais definidos pela orientação dos vértices. Para um monômio:
+As contribuições do contorno externo e dos furos são somadas com sinais definidos pela orientação dos vértices. A formulação parte da segunte expressão:
 $$
 \iint_A \xi^p\eta^q\,dA
 =\oint_{\partial A}\frac{\xi^{p+1}\eta^q}{p+1}\,d\eta
@@ -444,7 +445,7 @@ $$
 
 ## Integrais exigidas pela lei parabólica
 
-Substituindo $\varepsilon=b\eta+c$ na tensão parabólica, resulta um polinômio em $\eta$:
+Substituindo $\varepsilon=b\eta+c$ na expressão da tensão parabólica, resulta um polinômio em $\eta$, dado por:
 
 $$
 \sigma_c=\sigma_{cd}(D_0+D_1\eta+D_2\eta^2)
@@ -455,7 +456,7 @@ D_0=a_1c+a_2c^2, \quad
 D_1=a_1b+2a_2bc, \quad D_2=a_2b^2
 $$
 
-Os esforços do concreto exigem integrais de monômios até ordens suficientes para integrar $\sigma_c$, $\sigma_c\eta$ e $\sigma_c\xi$. A rotina de Green calcula essas parcelas ao longo dos segmentos recortados.
+Os esforços do concreto exigem integrais de monômios até ordens suficientes para integrar $\sigma_c$, $\sigma_c\eta$ e $\sigma_c\xi$. O esquema de integração calcula essas parcelas ao longo dos segmentos recortados.
 
 ---
 
@@ -495,7 +496,7 @@ $$
 
 ## Transformação dos momentos
 
-Os momentos são transformados para os eixos locais $(x,y)$ antes da comparação com $M_{sdx}$ e $M_{sdy}$.
+Como explicado anteriormente, os momentos resistentes são transformados para os eixos centrais $(x,y)$ antes da comparação com $M_{sdx}$ e $M_{sdy}$. Essa transformação é feita através da seguinte expressão:
 
 $$
 M_{Rx}=M_{R\xi}\cos\alpha-M_{R\eta}\sin\alpha
@@ -504,7 +505,7 @@ $$
 M_{Ry}=M_{R\xi}\sin\alpha+M_{R\eta}\cos\alpha
 $$
 
-A força normal não depende da rotação dos eixos. A transformação mantém os momentos resistentes no mesmo referencial das solicitações.
+Veja que a força normal, por ser perpendicular, não depende da rotação dos eixos. Essa transformação é importante pois mantém os momentos resistentes no mesmo referencial dos momentos atuantes.
 
 ---
 
@@ -521,37 +522,37 @@ Definindo $\mathbf r=\mathbf R-\mathbf S_d$:
 
 $$
 \mathbf r=\begin{bmatrix}
-N_R-N_{sd} \\
-M_{Rx}-M_{sdx} \\
-M_{Ry}-M_{sdy}
+N_R(x,\alpha,A_s)-N_{sd} \\
+M_{Rx}(x,\alpha,A_s)-M_{sdx} \\
+M_{Ry}(x,\alpha,A_s)-M_{sdy}
 \end{bmatrix}=\mathbf 0
 $$
 
 
 ---
 
-## Dimensionamento: incógnitas $x,\alpha,A_s$
+## Dimensionamento - busca das incógnitas $x,\alpha,A_s$
 
-Conhecidas a geometria, as posições das barras e suas proporções, procura-se a área total de aço. Cada tentativa define deformações, tensões e resultantes. O resultado deve respeitar equilíbrio, admissibilidade das variáveis e coerência das entradas.
+Conhecidas a geometria, as posições das barras e suas proporções, procura-se a área total de aço. Cada tentativa define deformações, tensões e solicitações resultantes. O resultado deve respeitar equilíbrio, admissibilidade das variáveis e coerência das entradas.
 
 $$
 \mathbf u_d=(x,\alpha,A_s)
 $$
 
-O dimensionamento ajusta três incógnitas para atender às três equações de equilíbrio.
+O dimensionamento ajusta essas três incógnitas para atender às três equações de equilíbrio.
 
 ---
 
-## Verificação: incógnitas $x,\alpha,\lambda$
+## Verificação - busca das incógnitas $x,\alpha,\lambda$
 
-Com $A_s$ conhecida, a verificação procura o estado resistente e o fator de reserva. Força normal e momentos resistentes ficam proporcionais às solicitações.
-
-$$
-\mathbf u_v=(x,\alpha,\lambda)
-$$
+Com $A_s$ conhecida, a verificação procura o estado resistente e o fator de reserva $\lambda$. Força normal e momentos resistentes ficam proporcionais às solicitações. De modo que:
 
 $$
 \mathbf R(x,\alpha,A_s)=\lambda\mathbf S_d
+$$
+
+$$
+\mathbf u_v=(x,\alpha,\lambda)
 $$
 
 O programa resolve três equações para $x$, $\alpha$ e $\lambda$.
@@ -570,7 +571,7 @@ Essa leitura depende da solução, das convenções de sinal e da hipótese de p
 
 ---
 
-## Da raiz exata à minimização dos resíduos
+## Método numérico para buscar a solução das incógnitas
 
 **Campos Filho (2014)**
 
@@ -578,17 +579,15 @@ A apostila desenvolve o método de Newton–Raphson, que usa a Jacobiana para at
 
 **Pyobliqua**
 
-O programa usa `scipy.optimize.least_squares` para minimizar a função objetivo formada pelos resíduos de equilíbrio (norma euclidiana ao quadrado):
+O programa usa `scipy.optimize.least_squares` para minimizar a função objetivo formada pelo resíduo do equilíbrio (norma euclidiana ao quadrado):
 
 $$
 \min_{\mathbf u}\;\frac{1}{2}\lVert\widetilde{\mathbf r}(\mathbf u)\rVert_2^2
 $$
 
-A parada do otimizador, por si só, não garante resíduos suficientemente pequenos.
+> Importante: a parada do otimizador, por si só, não garante resíduos suficientemente pequenos.
 
 ---
-
-## Escalas, limites e estimativas iniciais
 
 As três equações têm unidades e magnitudes diferentes. O programa normaliza os resíduos de força e momentos antes da minimização.
 
@@ -598,7 +597,7 @@ $$
 
 Limites para as incógnitas e estimativas iniciais ajudam a manter a busca em uma faixa numérica definida.
 
-> **Importante:** Conferir `success` e mensagem do solver, norma dos resíduos e tolerância de equilíbrio, além da plausibilidade de $x$, $\alpha$, $A_s$ ou $\lambda$.
+> Importante: conferir `success` e mensagem do solver, norma dos resíduos e tolerância de equilíbrio, além da plausibilidade de $x$, $\alpha$, $A_s$ ou $\lambda$.
 
 </div>
 
@@ -606,7 +605,7 @@ Limites para as incógnitas e estimativas iniciais ajudam a manter a busca em um
 
 ---
 
-## Newton–Raphson e `least_squares`
+## Resumo
 
 | Campos Filho (2014) | Pyobliqua |
 |---|---|
@@ -680,7 +679,7 @@ O desenho ajuda a detectar erros de entrada e a interpretar o estado de deforma�
 
 ## Saída do dimensionamento
 
-O modo dimensionamento informa a área total de aço calculada e o estado resistente associado. Itens para apresentar na demonstração:
+O modo dimensionamento informa a área total de aço calculada e o estado resistente associado. O programa apresenta os seguintes itens:
 
 - geometria e propriedades da seção;
 - $x$, $\alpha$ e $A_s$;
@@ -694,15 +693,12 @@ Uma mensagem de convergência deve ser lida junto da norma dos resíduos e dos d
 
 ## Saída da verificação
 
-O modo verificação recebe $A_s$ fixa e apresenta $x$, $\alpha$ e $\lambda$.
-
-Na demonstração, destacar:
+O modo verificação recebe $A_s$ fixa e apresenta $x$, $\alpha$ e $\lambda$. O programa apresenta os seguintes itens:
 
 - armadura fornecida;
 - resultantes para o estado calculado;
 - fator de reserva;
 - norma dos resíduos e estado de convergência;
-- interpretação limitada ao equilíbrio proporcional da seção.
 
 ---
 
@@ -712,19 +708,17 @@ Na demonstração, destacar:
 
 ## Diagrama de interação $M_x$–$M_y$
 
-Para $N_{sd}$ e $A_s$ fixos, o programa amostra estados resistentes em orientações da linha neutra.
+Para complementar a análise, foi adicionado o cálculo do diagrama de interação. Para $N_{sd}$ e $A_s$ fixos, o programa amostra estados resistentes em diversas orientações da linha neutra.
 
 Na configuração atual da interface, a busca usa 72 orientações angulares e até 100 profundidades por orientação. Os pontos encontrados são mostrados no plano $(M_x,M_y)$, junto da solicitação.
 
-O resultado é uma amostragem numérica. A própria interface alerta que o gráfico não é uma envoltória resistente certificada e que a posição do ponto solicitante não comprova segurança estrutural.
+O resultado é uma amostragem numérica. A interface alerta que o gráfico não é uma envoltória resistente certificada e que a posição do ponto solicitante não comprova segurança estrutural.
 
 ---
 
 ![alt text](image-11.png)
 
 ---
-
-## Interpolação radial e seus limites
 
 O programa pode estimar $\lambda$ por interpolação radial entre estados amostrados e o vetor de momentos solicitantes.
 
@@ -802,7 +796,7 @@ Um otimizador pode parar sem que o equilíbrio esteja atendido. O Pyobliqua sepa
 
 **A validação numérica independente ainda não foi realizada.**
 
-Portanto, esta apresentação descreve a formulação, a implementação e o comportamento observado do programa. Não declara o Pyobliqua integralmente validado nem recomenda usar seus resultados sem as verificações técnicas pertinentes.
+Portanto, esta apresentação descreve brevemente a formulação, a implementação e o comportamento observado do programa. Não declara o Pyobliqua integralmente validado nem recomenda usar seus resultados sem as verificações técnicas pertinentes.
 
 Próxima etapa de validação: comparar casos selecionados com cálculos independentes, referências publicadas ou soluções de outro procedimento, documentando tolerâncias e diferenças.
 
