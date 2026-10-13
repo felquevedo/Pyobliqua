@@ -25,7 +25,7 @@ Ao final dessa aula você deve conseguir:
 
 - explicar como $x$ e $\alpha$ definem o campo de deformações;
 - relacionar deformações, tensões e esforços resistentes;
-- distinguir dimensionamento de verificação por $\lambda$;
+- distinguir dimensionamento de verificação;
 - reconhecer o papel do `least_squares` no Pyobliqua;
 - interpretar resultados sem confundir convergência com validação.
 
@@ -33,7 +33,7 @@ Ao final dessa aula você deve conseguir:
 
 ## Sequência do cálculo
 
-A flexão composta oblíqua, segue o seguinte roteiro de cálculo:
+O processo de cálculo da flexão composta oblíqua, segue o seguinte roteiro de cálculo:
 
 $$
 \textbf{geometria} \longrightarrow \textbf{deformações} \longrightarrow
@@ -41,7 +41,7 @@ $$
 \longrightarrow \textbf{equilíbrio}
 $$
 
-> Cada etapa usa a saída da anterior. O solver atua no final, ajustando as incógnitas do problema para reduzir o desequilíbrio entre ações e resistências.
+> Cada etapa usa a saída da anterior. O solver atua no final, ajustando as incógnitas do problema para reduzir o desequilíbrio entre solicitações de cálculo e resistências de cálculo.
 
 ---
 
@@ -578,7 +578,7 @@ A apostila desenvolve o método de Newton–Raphson, que usa a Jacobiana para at
 
 **Pyobliqua**
 
-O programa usa `scipy.optimize.least_squares` para minimizar a função objetivo formada pelos resíduos de equilíbrio:
+O programa usa `scipy.optimize.least_squares` para minimizar a função objetivo formada pelos resíduos de equilíbrio (norma euclidiana ao quadrado):
 
 $$
 \min_{\mathbf u}\;\frac{1}{2}\lVert\widetilde{\mathbf r}(\mathbf u)\rVert_2^2
@@ -598,7 +598,7 @@ $$
 
 Limites para as incógnitas e estimativas iniciais ajudam a manter a busca em uma faixa numérica definida.
 
-Conferir `success` e mensagem do solver, norma dos resíduos e tolerância de equilíbrio, além da plausibilidade de $x$, $\alpha$, $A_s$ ou $\lambda$.
+> **Importante:** Conferir `success` e mensagem do solver, norma dos resíduos e tolerância de equilíbrio, além da plausibilidade de $x$, $\alpha$, $A_s$ ou $\lambda$.
 
 </div>
 
@@ -718,7 +718,9 @@ Na configuração atual da interface, a busca usa 72 orientações angulares e a
 
 O resultado é uma amostragem numérica. A própria interface alerta que o gráfico não é uma envoltória resistente certificada e que a posição do ponto solicitante não comprova segurança estrutural.
 
-**Captura neste slide (slide 34):** inserir o diagrama $M_x$–$M_y$, destacando a solicitação e os estados resistentes encontrados.
+---
+
+![alt text](image-11.png)
 
 ---
 
@@ -734,33 +736,52 @@ O gráfico e a estimativa são recursos de análise e visualização. Não const
 
 ## Exemplo 5.1: dimensionamento
 
-O exemplo 5.1 da apostila apresenta um caso de dimensionamento. Ele permite percorrer os dados de entrada e acompanhar a saída do programa.
+<div class="duas-colunas">
 
-| Dado de entrada | O que acompanhar |
-|---|---|
-| Geometria e solicitações | Contornos, posição das barras e sinais |
-| Armadura proporcional | Conversão das proporções para a área total $A_s$ |
-| Resultado | Estado de deformação, equilíbrio e área calculada |
+<div>
 
-Reproduzir o exemplo é uma comparação com a referência, mas não substitui uma validação numérica independente.
+| Dado | Valores |
+| :---: | :---: |
+| Geometria | Seção quadrada vazada: contorno externo de 85 × 85 cm e furo central de 25 × 25 cm; 11 vértices no arquivo de entrada. |
+| Coeficientes parciais | $\gamma_c=1{,}4$; $\gamma_s=1{,}15$. |
+| Concreto | $f_{ck}=20\,\text{MPa}$. |
+| Aço | 20 barras; $f_{yk}=500\,\text{MPa}$; $E_s=210\,\text{GPa}$; $\rho_j=0{,}05$ por barra. |
+| Solicitações | $N_{sd}=-200\,\text{kN}$; $M_{sdx}=-500\,\text{kN·m}$; $M_{sdy}=+500\,\text{kN·m}$. |
+| Resultado publicado | $A_s=37{,}29\,\text{cm}^2$; deformação na fibra superior $=-3{,}500\,‰$; na inferior $=+7{,}946\,‰$; inclinação da linha neutra $\alpha=-45^\circ$. |
 
-**Figura neste slide (slide 36):** inserir a Fig. 5.1 da apostila, com a seção do exemplo de dimensionamento.
+</div>
+
+<div>
+
+![alt text](image-12.png)
+
+</div>
 
 ---
 
 ## Exemplo 5.2: verificação
 
-O exemplo 5.2 verifica uma seção com área de armadura conhecida. No Pyobliqua, a demonstração acompanha a busca de $x$, $\alpha$ e $\lambda$.
+<div class="duas-colunas">
 
-| Dado de entrada | O que acompanhar |
-|---|---|
-| Geometria e armadura | Posição das barras e área total conhecida |
-| Solicitações | Componentes $N_{sd}$, $M_{sdx}$ e $M_{sdy}$ |
-| Resultado | Equilíbrio proporcional e fator de reserva |
+<div>
 
-A comparação ajuda a conferir a implementação do procedimento. Ela não constitui validação independente.
+| Dado | Valor |
+| :---: | :---: |
+| Geometria | Seção poligonal em “I”: 13 vértices; altura de 120 cm, mesa superior de 70 cm, alma de 15 cm e mesa inferior de 25 cm. |
+| Coeficientes parciais | $\gamma_c=1{,}4$; $\gamma_s=1{,}15$. |
+| Concreto | $f_{ck}=20\,\text{MPa}$. |
+| Aço | 15 barras; área total fornecida $A_s=30\,\text{cm}^2$; $f_{yk}=500\,\text{MPa}$; $E_s=21\,000\,\text{kN/cm}^2=210\,\text{GPa}$; $\rho_j=0{,}066667$ por barra. |
+| Solicitações | $N_{sd}=0$; $M_{sdx}=-1\,000\,\text{kN·m}$; $M_{sdy}=0$. |
+| Resultado publicado | Reserva $=0{,}9346$; momento resistente $M_{Rx}=-93\,460\,\text{kN·cm}=-934{,}6\,\text{kN·m}$; deformação superior $=-1{,}445\,‰$; inferior $=+10{,}000\,‰$; $\alpha\approx0^\circ$. |
 
-**Figura neste slide (slide 37):** inserir a Fig. 5.2 da apostila, com a seção do exemplo de verificação.
+</div>
+
+<div>
+
+![alt text](image-14.png)
+
+</div>
+
 
 ---
 
@@ -784,22 +805,6 @@ Um otimizador pode parar sem que o equilíbrio esteja atendido. O Pyobliqua sepa
 Portanto, esta apresentação descreve a formulação, a implementação e o comportamento observado do programa. Não declara o Pyobliqua integralmente validado nem recomenda usar seus resultados sem as verificações técnicas pertinentes.
 
 Próxima etapa de validação: comparar casos selecionados com cálculos independentes, referências publicadas ou soluções de outro procedimento, documentando tolerâncias e diferenças.
-
----
-
-## Figuras úteis da apostila
-
-| Slides | Assunto | Figura ou tabela de Campos Filho (2014) |
-|---:|---|---|
-| 4 | Flexão composta oblíqua | Fig. 1.1 |
-| 5 | Geometria e furos | Fig. 2.1 |
-| 6 | Esforços atuantes | Fig. 2.2 |
-| 8 e 10 | Eixos rotacionados e linha neutra | Figs. 2.3 e 2.5 |
-| 9 e 10 | Domínios no ELU | Fig. 2.4 e Tabela 2.1 |
-| 12, 14, 15 e 16 | Concreto, parâmetros, aço e integração | Figs. 2.6, Tabela 2.2, Fig. 2.7 e Fig. 2.8 |
-| 36 e 37 | Exemplos de cálculo | Figs. 5.1 e 5.2 |
-
-As figuras devem ser identificadas com a referência completa e a página correspondente.
 
 ---
 
