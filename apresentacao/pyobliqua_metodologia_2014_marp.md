@@ -3,19 +3,19 @@ marp: true
 theme: pyobliqua-ufrgs
 paginate: true
 math: katex
-footer: "Pyobliqua | Formulação baseada em Campos Filho (2014)"
+footer: "PPGEC/UFRGS - PEC00013 - Tópicos Avançados em Concreto - Prof. Felipe Quevedo"
 ---
 
 <!-- _class: lead -->
 
 # Flexão composta Oblíqua no Estado Limite Último
 
-## Dimensionamento e verificação de seções poligonais
+## Dimensionamento e verificação de seções poligonais de CA
 
 ### Apresentação do programa: Pyobliqua
 
 Metodologia de Américo Campos Filho (2014) e implementação atual em Python  
-UFRGS | Engenharia Civil
+PPGEC | Engenharia Civil | UFRGS
 
 ---
 
@@ -25,9 +25,9 @@ Ao final dessa aula você deve conseguir:
 
 - identificar o que é a flexão composta
 - explicar como $x$ e $\alpha$ definem o campo de deformações;
-- relacionar deformações, tensões e esforços resistentes;
+- entender as expressões que relacionam deformações, tensões e esforços resistentes;
+- entender as condições de equilíbrio que levam ao equilíbrio da seção;
 - distinguir dimensionamento de verificação;
-- reconhecer o papel do `least_squares` no Pyobliqua;
 - interpretar resultados sem confundir convergência com validação.
 
 ---
@@ -38,7 +38,7 @@ Ao final dessa aula você deve conseguir:
 
 <div>
 
-Na flexão composta atuam simultaneamente força normal e momentos fletores.
+Na flexão composta atuam **simultaneamente força normal e momentos fletores**, de modo que as solicitações são dadas por:
 
 $$
 \mathbf S_d = (N_{sd},M_{sdx},M_{sdy})
@@ -70,7 +70,7 @@ $$
 \longrightarrow \textbf{equilíbrio}
 $$
 
-> Cada etapa usa a saída da anterior. O solver atua no final, ajustando as incógnitas do problema para reduzir o desequilíbrio entre solicitações de cálculo e resistências de cálculo.
+> Cada etapa usa a saída da anterior. É necessário utilizar um método numérico, ajustando as incógnitas do problema para reduzir o desequilíbrio entre solicitações de cálculo e resistências de cálculo.
 
 ---
 
@@ -84,9 +84,9 @@ Para se ter generalidade, a seção de concreto armado é representada por uma p
 
 - o contorno externo é orientado no sentido anti-horário;
 - os contornos dos furos são orientados no sentido horário;
-- cada barra tem sua posição, sua área $A_s$ em caso de o dimensionamento, ou uma fração da área total $\rho$ em caso de verificação.
+- cada barra tem sua posição, sua área $A_{si}$ em caso de o dimensionamento, ou uma fração da área total $\rho A_s$ em caso de verificação.
 
-Essa representação é adequada para a técnica de integração de Green que permite calcular os esforços resistentetes do concreto transformando integral de área em integrais de contorno.
+Essa representação é adequada para a técnica de integração de Green que permite calcular os esforços resistentetes do concreto transformando integrais de área em integrais de contorno.
 
 </div>
 
@@ -98,19 +98,19 @@ Essa representação é adequada para a técnica de integração de Green que pe
 
 ---
 
-## Sistema global e Sistema centroidal
+## Sistema global e Sistema local (centroidal)
 
 <div class="duas-colunas">
 
 <div>
 
-As coordenadas geométricas definem a seção no sistema global $(X,Y)$. Calculam-se área e centroide e transfere-se a origem do sistema para o centroide da seção:
+As coordenadas geométricas definem a seção no sistema global $OXY$. Calculam-se a área e o centroide e transfere-se a origem do sistema para o centroide da seção $Cxy$ em que:
 
 $$
 x=X-X_C, \qquad y=Y-Y_C
 $$
 
-Os esforços resistentes $N_{R}$, $M_{Rx}$, $M_{Ry}$ são então referidos aos eixos centroidais locais e comprados com as solicitações atuantes de cálculo $N_{Ad}$, $M_{Axd}$ e $M_{Ayd}$.
+Os esforços resistentes $N_{R}$, $M_{Rx}$, $M_{Ry}$ são então referidos aos eixos locais e comparados com as solicitações atuantes de cálculo $N_{Ad}$, $M_{Axd}$ e $M_{Ayd}$.
 
 </div>
 
@@ -122,7 +122,7 @@ Os esforços resistentes $N_{R}$, $M_{Rx}$, $M_{Ry}$ são então referidos aos e
 
 ---
 
-## Hipótese de deformações planas e sistema local $(\xi,\eta)$
+## Hipótese de deformações planas e o sistema local rotacionado
 
 <div class="duas-colunas">
 
@@ -130,7 +130,7 @@ Os esforços resistentes $N_{R}$, $M_{Rx}$, $M_{Ry}$ são então referidos aos e
 
 Adota-se que as **seções planas permanecem planas**, ou seja, a deformação longitudinal varia linearmente ao longo da seção.
 
-O **estado de deformações** passa a ser definido pela **profundidade** $x$ da linha neutra e pela **orientação** $\alpha$, de modo que para cada ponto $(x,y)$, correspondem ao par $(\xi,\eta)$ no sistema local, dado por:
+O **estado de deformações** passa a ser definido pela **profundidade** $x$ da linha neutra e pela **orientação** $\alpha$, de modo que para cada ponto $(x,y)$, corresponde a um par $(\xi,\eta)$ em um sistema local rotacionado de $\alpha$, dado por:
 
 $$
 \xi=x\cos\alpha+y\sin\alpha
@@ -139,6 +139,8 @@ $$
 $$
 \eta=-x\sin\alpha+y\cos\alpha
 $$
+
+Importante: $\xi$ e $\eta$ não são necessariamente eixos principais centrais.
 
 </div>
 
@@ -152,13 +154,13 @@ $$
 
 <div>
 
-O campo de deformações passa a ser:
+O campo de deformações passa a ser dado pela seguinte expressão:
 
 $$
 \varepsilon(\eta)=b\eta+c
 $$
 
-E dessa forma a deformação de qualquer ponto $P$ é obtida por sua coordenada local:
+E dessa forma a deformação $\varepsilon_P$ de qualquer ponto $P$ é obtida por sua coordenada local $\eta_P$:
 
 $$
 \varepsilon_P=b\eta_P+c
@@ -181,7 +183,7 @@ A linha neutra corresponde ao conjunto de pontos em que $\varepsilon=0$.
 
 ## Domínios de deformação no ELU
 
-Os domínios representam configurações-limite de deformação da seção:
+Os domínios classificam as possíveis distribuições de deformações da seção no ELU. Seus limites correspondem a configurações-limite definidas pelas deformações do concreto e do aço. Tem-se:
 
 
 ![alt text](image-4.png)
@@ -203,7 +205,7 @@ Os domínios representam configurações-limite de deformação da seção:
 
 Os limites de $x$, $\varepsilon_s$ e $\varepsilon_i$ dependem de $d$, $h$, $\varepsilon_{c2}$ (deformação do ínicio do patamar plástico do concreto) e $\varepsilon_{cu}$ (deformação última do concreto, associado à ruptura). A Tabela 1 abaixo mostra os limites de cada domínio de deformação:
 
-![alt text](image-5.png)
+![alt text](image-17.png)
 
 ---
 
@@ -248,7 +250,7 @@ $$
 \varepsilon_P=b\eta_P+c
 $$
 
-Essa etapa é a compatibilidade cinemática que conecta a posição da linha neutra à deformação em qualquer ponto da seção.
+Dessa forma, tem-se a compatibilidade cinemática que conecta a posição da linha neutra à deformação em qualquer ponto da seção.
 
 ---
 
@@ -258,7 +260,7 @@ Essa etapa é a compatibilidade cinemática que conecta a posição da linha neu
 
 <div>
 
-Nessa formulação, a resistência à tração do concreto é desprezada. Adota-se o sentido da compressão negativa e a lei parábola-retângulo. A expressão usa os limites $\varepsilon_{c2}$ e $\varepsilon_{cu}$ e os coeficientes $a_1$ e $a_2$ de modo que:
+Nessa formulação, a **resistência à tração do concreto é desprezada**. Adota-se o sentido da compressão negativa e a lei parábola-retângulo. A expressão usa os limites $\varepsilon_{c2}$ e $\varepsilon_{cu}$ e os coeficientes $a_1$ e $a_2$ de modo que:
 
 $$
 \sigma_c(\varepsilon)=
@@ -269,11 +271,8 @@ $$
 \end{cases}
 $$
 
-$$
-f_{cd}=\frac{f_{ck}}{\gamma_c}, \qquad \sigma_{cd}=0{,}85f_{cd}
-$$
 
-Os coeficientes $a_1$ e $a_2$ aproximam o diagrama do concreto por uma parábola. Esse aspecto facilita a integração.
+Em que $f_{cd}=\frac{f_{ck}}{\gamma_c}$ e $\sigma_{cd}=0{,}85f_{cd}$, e os coe_ ficientes $a_1$ e $a_2$ aproximam a parte não-linear do diagrama do concreto por uma parábola. Esse aspecto é próprio da implementação e facilita a integração.
 
 </div>
 
@@ -301,20 +300,13 @@ A Tabela abaixo mostra os coeficientes que aproximam o trecho parabólico.
 | C80 | 69363 | 581,26 |
 | C90 | 64545 | 561,34 |
 
-$$
-\sigma_c(\varepsilon)=
-\begin{cases}
-0, & \varepsilon\geq 0 \\
-\sigma_{cd}(a_2\varepsilon^2+a_1\varepsilon), & -\varepsilon_{c2}\leq\varepsilon<0 \\
--\sigma_{cd}, & -\varepsilon_{cu}\leq\varepsilon< -\varepsilon_{c2}
-\end{cases}
-$$
+A figura ao lado mostra a proximidade da parábola do 2º grau, com os coeficientes ajustados, junto a curva exata da NBR-6118:2014 para $f_{ck}$ = 90 MPa, cujo expoente $n$ é igual a $1,4$.
 
 </div>
 
 <div>
 
-![alt text](image-7.png)
+![alt text](image-18.png)
 
 </div>
 
@@ -348,7 +340,7 @@ Importante notar que nessas fórmulas é necessário utilizar a resistência em 
 
 <div>
 
-![alt text](image-7.png)
+![alt text](image-13.png)
 
 </div>
 
@@ -466,13 +458,7 @@ Os esforços do concreto exigem integrais de monômios até ordens suficientes p
 
 <div>
 
-No sistema rotacionado $(\xi,\eta)$, integram-se tensões sobre o concreto e somam-se as contribuições discretas das barras. O sinal do momento depende da convenção dos eixos e dos esforços definida para a seção. 
-
-As barras entram como parcelas discretas. Para cada barra $j$, o cálculo usa posição, deformação, tensão e área $A_{sj}$.
-
-</div>
-
-<div>
+No sistema local rotacionado $(\xi,\eta)$, integram-se tensões sobre o concreto e somam-se as contribuições discretas das barras. As barras entram como parcelas discretas. Para cada barra $j$, o cálculo usa posição, deformação, tensão e área $A_{sj}$.
 
 $$
 N_R=\int_{A_c}\sigma_c\,dA+\sum_j A_{sj}\sigma_{sj}
@@ -485,6 +471,12 @@ $$
 $$
 M_{R\eta}=-\int_{A_c}\sigma_c\xi\,dA-\sum_j A_{sj}\sigma_{sj}\xi_j
 $$
+
+</div>
+
+<div>
+
+![alt text](image-19.png)
 
 </div>
 
@@ -568,6 +560,10 @@ Na verificação, para uma solução válida do equilíbrio proporcional tem-se:
 | $\lambda>1$ | A resistência calculada excede a solicitação ao longo do raio adotado |
 
 Essa leitura depende da solução, das convenções de sinal e da hipótese de proporcionalidade. $\lambda$ não substitui verificações normativas ou a análise completa do elemento estrutural.
+
+---
+
+![alt text](image-20.png)
 
 ---
 
@@ -679,13 +675,13 @@ O desenho ajuda a detectar erros de entrada e a interpretar o estado de deforma�
 
 ## Saída do dimensionamento
 
-O modo dimensionamento informa a área total de aço calculada e o estado resistente associado. O programa apresenta os seguintes itens:
+O modo dimensionamento, dado a fração de aço total de cada barra, calcula a área total de aço e o estado resistente associado. O programa apresenta os seguintes itens:
 
 - geometria e propriedades da seção;
 - $x$, $\alpha$ e $A_s$;
 - deformações extremas e domínio;
 - esforços resistentes e resíduos de equilíbrio;
-- visualização da seção.
+- visualização da seção (linha neutra, deformações e tensões).
 
 Uma mensagem de convergência deve ser lida junto da norma dos resíduos e dos dados de entrada.
 
@@ -693,12 +689,15 @@ Uma mensagem de convergência deve ser lida junto da norma dos resíduos e dos d
 
 ## Saída da verificação
 
-O modo verificação recebe $A_s$ fixa e apresenta $x$, $\alpha$ e $\lambda$. O programa apresenta os seguintes itens:
+O modo verificação, dado a área de aço de cada barra, calcula a reserva $\lambda$ que relaciona o estado resistente ao solicitante. O programa apresenta os seguintes itens:
 
-- armadura fornecida;
-- resultantes para o estado calculado;
-- fator de reserva;
-- norma dos resíduos e estado de convergência;
+- geometria e propriedades da seção;
+- $x$, $\alpha$ e $\lambda$ (fator de reserva);
+- deformações extremas e domínio;
+- esforços resistentes e resíduo de equilíbrio;
+- visualização da seção (linha neutra, deformações e tensões).
+
+Uma mensagem de convergência deve ser lida junto da norma dos resíduos e dos dados de entrada.
 
 ---
 
@@ -708,11 +707,9 @@ O modo verificação recebe $A_s$ fixa e apresenta $x$, $\alpha$ e $\lambda$. O 
 
 ## Diagrama de interação $M_x$–$M_y$
 
-Para complementar a análise, foi adicionado o cálculo do diagrama de interação. Para $N_{sd}$ e $A_s$ fixos, o programa amostra estados resistentes em diversas orientações da linha neutra.
+Para complementar a análise, foi adicionado o cálculo do diagrama de interação. Para $N_{sd}$ e $A_s$ fixos, o programa faz uma amostragem numérica dos estados resistentes em diversas orientações da linha neutra.
 
 Na configuração atual da interface, a busca usa 72 orientações angulares e até 100 profundidades por orientação. Os pontos encontrados são mostrados no plano $(M_x,M_y)$, junto da solicitação.
-
-O resultado é uma amostragem numérica. A interface alerta que o gráfico não é uma envoltória resistente certificada e que a posição do ponto solicitante não comprova segurança estrutural.
 
 ---
 
@@ -792,6 +789,15 @@ Um otimizador pode parar sem que o equilíbrio esteja atendido. O Pyobliqua sepa
 
 ---
 
+Ou seja, em outras palavras, confira:
+
+- as unidades corretas dos dados de entrada;
+- a indicação de `Convergencia: SIM` e a `Norma dos resíduos`. No código, a aceitação exige que o SciPy tenha parado com sucesso e que essa norma seja menor ou igual à $10^{-6}$.
+- Verifique o estado da seção, ou seja, dado o domínio de deformação, compare as deformações limites pertinentes a cada material;
+- Verifique o equilíbrio, ou seja, se $N_{R}$, $M_{Rx}$ e $M_{Ry}$ estão próximas das solicitantes.
+
+---
+
 ## Estado da validação
 
 **A validação numérica independente ainda não foi realizada.**
@@ -802,10 +808,40 @@ Próxima etapa de validação: comparar casos selecionados com cálculos indepen
 
 ---
 
+## Atividade para Entregar
+
+---
+
+**Desafio:** proponha uma seção poligonal de concreto armado e compare o Pyobliqua com um procedimento independente — outro software, uma planilha ou um código próprio.
+
+1. **Prepare o caso:** reúna geometria, materiais, armaduras e solicitações.
+2. **Resolva no Pyobliqua:** registre os dados de entrada e os principais resultados.
+3. **Varie os Resultados:** modifique as solicitações de modo a ter os 5 domínios possíveis.
+4. **Resolva independentemente:** procure outro software ou planilha que resolve o mesmo problema.
+5. **Compare e explique:** identifique concordâncias, diferenças e suas possíveis causas.
+
+---
+
+**Compare, conforme disponível:** área de armadura, posição da linha neutra, deformações, domínio do ELU, esforços resistentes e resíduos de equilíbrio.
+
+**Entrega:**
+
+Um relatório curto com:
+
+- dados (geometria, materiais, armaduras e solicitações);
+- capturas ou tabelas dos resultados;
+- comparação dos valores principais;
+- explicação das diferenças encontradas;
+- limitações do procedimento usado como referência.
+
+---
+
 ## Referências e escopo
 
 CAMPOS FILHO, Américo. *Dimensionamento e verificação de seções poligonais de concreto armado submetidas à flexão composta oblíqua*. UFRGS, 2014. Capítulos 1–5 e Anexo A.
 
 ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. *ABNT NBR 6118:2014: Projeto de estruturas de concreto*.
+
+MVREAL. FCO. GitHub, [s. d.]. Disponível em: https://github.com/mvreal/FCO. Acesso em: 14 out. 2026.
 
 O conteúdo normativo desta apresentação segue a referência de 2014. O programa é apresentado como ferramenta acadêmica em desenvolvimento, com validação numérica independente pendente.

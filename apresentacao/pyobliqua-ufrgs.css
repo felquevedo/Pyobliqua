@@ -586,7 +586,7 @@ button.copy {
 }
 
 .duas-colunas p {
-    text-align: left;
+    text-align: justify;
 }
 
 .duas-colunas p:first-child,
