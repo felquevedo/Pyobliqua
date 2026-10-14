@@ -8,7 +8,7 @@ footer: "PPGEC/UFRGS - PEC00013 - Tópicos Avançados em Concreto - Prof. Felipe
 
 <!-- _class: lead -->
 
-# Flexão composta Oblíqua no Estado Limite Último
+# Flexão Composta Oblíqua no Estado Limite Último
 
 ## Dimensionamento e verificação de seções poligonais de CA
 
@@ -26,7 +26,7 @@ Ao final dessa aula você deve conseguir:
 - identificar o que é a flexão composta
 - explicar como $x$ e $\alpha$ definem o campo de deformações;
 - entender as expressões que relacionam deformações, tensões e esforços resistentes;
-- entender as condições de equilíbrio que levam ao equilíbrio da seção;
+- entender as condições que levam ao equilíbrio da seção;
 - distinguir dimensionamento de verificação;
 - interpretar resultados sem confundir convergência com validação.
 
@@ -98,7 +98,7 @@ Essa representação é adequada para a técnica de integração de Green que pe
 
 ---
 
-## Sistema global e Sistema local (centroidal)
+## Sistema global e sistema local (centroidal)
 
 <div class="duas-colunas">
 
