@@ -87,7 +87,7 @@ def residuos_equilibrio(
 
 
 def resolver_equilibrio(
-    secao, concreto, aco, Nsd, Msdx, Msdy, x0, alfa0, As0,
+    secao, concreto, aco, Nsd, Msdx, Msdy, x0=None, alfa0=0.0, As0=None,
     taxa_max=0.08, fator_x_max=5.0, multiplas_tentativas=True,
     tolerancia_equilibrio=1e-6
 ):
@@ -173,6 +173,10 @@ def resolver_equilibrio(
         return np.clip(valores, limites_inf + [1e-9, 1e-9, 0],
                        limites_sup - [1e-9, 1e-9, 0])
 
+    if x0 is None:
+        x0 = 0.4 * h
+    if As0 is None:
+        As0 = 0.01 * secao.area
     iniciais = [preparar(x0, alfa0, As0)]
     if multiplas_tentativas:
         for angulo in (0.0, pi / 4, -pi / 4, pi / 2, -pi / 2):

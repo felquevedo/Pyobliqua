@@ -914,16 +914,12 @@ class Interface(tk.Tk):
         try:
             N, Mx, My = esforcos
             if modo == 'dimensionamento':
-                r = resolver_equilibrio(secao, concreto, aco, N, Mx, My,
-                        x0=0.4*secao.altura(0), alfa0=0.0,
-                        As0=0.01*secao.area, multiplas_tentativas=True)
+                r = resolver_equilibrio(secao, concreto, aco, N, Mx, My)
                 x, alfa, As_resultado = r.x
                 lam = None
             else:
                 r = resolver_verificacao(secao, concreto, aco, As=As,
-                        Nsd=N, Msdx=Mx, Msdy=My,
-                        x0=0.4*secao.altura(0), alfa0=0.0,
-                        lambda0=1.0, multiplas_tentativas=True)
+                        Nsd=N, Msdx=Mx, Msdy=My)
                 x, alfa, lam = r.x
                 As_resultado = As
             sucesso = bool(r.success)

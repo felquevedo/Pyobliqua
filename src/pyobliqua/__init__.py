@@ -10,10 +10,14 @@ from .analise.equilibrio import resolver_equilibrio
 from .analise.verificacao import resolver_verificacao
 from .analise.estado_deformacao import EstadoDeformacao
 from .visualizacao.desenho_secao import desenhar_secao
-from .interface.interface_pyobliqua import desenhar_diagramas_deformacoes_tensoes
+from .visualizacao.diagramas import desenhar_diagramas_deformacoes_tensoes
 
 __all__ = [
     "Secao", "Barra", "Concreto", "Aco", "resolver_equilibrio",
     "resolver_verificacao", "EstadoDeformacao", "desenhar_secao",
     "desenhar_diagramas_deformacoes_tensoes",
 ]
+
+from .unidades import Unidades
+from .api import Modelo, Resultado
+__all__ += ["Unidades", "Modelo", "Resultado"]
