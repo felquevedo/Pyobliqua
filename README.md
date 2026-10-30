@@ -2,87 +2,95 @@
 
 **Dimensionamento e verificação de seções de concreto armado submetidas à flexão composta oblíqua.**
 
-O **Pyobliqua** é um programa desenvolvido em Python para aplicações acadêmicas, com duas formas de utilização: **interface gráfica** e **scripts Python**.
+O **Pyobliqua** é um programa desenvolvido em Python para fins acadêmicos. Pode ser utilizado por meio de uma **interface gráfica** ou diretamente em **scripts Python**.
 
-## Funcionalidades
+## 1. Instalação no Windows
 
-- Dimensionamento da área de armadura de seções poligonais de concreto armado.
+Baixe a versão mais recente do instalador:
+
+[**Download do Pyobliqua**](https://github.com/SEU_USUARIO/SEU_REPOSITORIO/releases/latest)
+
+Execute o instalador e siga as instruções.
+Não é necessário instalar Python.
+
+## 2. Funcionalidades
+
+- Dimensionamento da armadura de seções poligonais de concreto armado.
 - Verificação de seções com armadura conhecida.
-- Seções com contornos poligonais, furos e barras de aço.
-- Visualização da seção, linha neutra, deformações e tensões.
-- Representação do diagrama de interação **Mx–My**.
+- Representação de seções poligonais, incluindo furos e barras de aço.
+- Visualização da seção transversal, linha neutra, deformações e tensões.
+- Geração do diagrama de interação **Mx–My**.
+- Leitura e gravação dos dados da interface em arquivos `.dad`.
 
-## 1. Abrir a interface gráfica
+## 3. Abrir a interface gráfica usando o Python
 
-Com o projeto configurado no ambiente Python, abra um terminal na pasta do projeto e execute:
+Com o projeto configurado no ambiente Python, execute na raiz do repositório:
 
 ```powershell
 python -m pyobliqua
 ```
 
-Na interface, selecione **Dimensionamento** ou **Verificação**, informe a geometria, os materiais, as armaduras e os esforços solicitantes e execute o cálculo. É possível visualizar os resultados e os diagramas e trabalhar com arquivos `.dad`.
+A interface permite informar a geometria, as propriedades dos materiais e os esforços solicitantes, realizar os cálculos e visualizar os resultados.
 
-## 2. Utilizar por script Python
+![Janela principal do Pyobliqua](docs/images/janela.png)
 
-O projeto inclui o arquivo `src/pyobliqua/main.py`, com dois exemplos de utilização do núcleo de cálculo:
+## 4. Utilizar em scripts Python
 
-- **Exemplo 5.1 — Dimensionamento:** seção quadrada vazada de 85 × 85 cm.
-- **Exemplo 5.2 — Verificação:** seção poligonal com armadura conhecida.
+O arquivo **`main.py`** contém exemplos de **dimensionamento** (Exemplo 5.1) e **verificação** (Exemplo 5.2). Ele pode ser usado como ponto de partida para criar outros estudos e automatizar cálculos.
 
-Para executar os exemplos, utilize:
+**[Consultar ou baixar o arquivo main.py](src/pyobliqua/main.py)** — no GitHub, abra o link e utilize **Download raw file** para salvá-lo.
+
+Para executar os exemplos:
 
 ```powershell
 python -m pyobliqua.main
 ```
 
-O script calcula os resultados e apresenta gráficos das seções e dos estados de deformação e tensão.
-
-### Criar seus próprios scripts
-
-O pacote também disponibiliza uma API para utilizar os cálculos em outros programas:
+Também é possível utilizar a API do pacote em scripts próprios:
 
 ```python
 from pyobliqua import Modelo, Unidades
 
-modelo = Modelo(
-    Unidades(forca="kN", momento="kN.m", tensao="MPa")
-)
+modelo = Modelo(Unidades(forca="kN", momento="kN.m", tensao="MPa"))
 
-# Defina a seção e os materiais conforme os exemplos do projeto.
-# Em seguida, utilize:
+# Defina a seção e os materiais como nos exemplos do main.py.
 # resultado = modelo.dimensionar(secao, concreto, aco, Nsd, Msdx, Msdy)
 # resultado = modelo.verificar(secao, concreto, aco, As=As, Nsd=Nsd, Msdx=Msdx, Msdy=Msdy)
 ```
 
-Para consultar a construção completa da geometria, a definição dos materiais e a interpretação dos resultados, veja **`src/pyobliqua/main.py`**.
-
-## 3. Estrutura principal
+## 5. Estrutura principal do repositório
 
 ```text
 Pyobliqua/
 ├── README.md
 ├── pyproject.toml
+├── docs/
+│   └── apresentacao/          # Apresentação em Marp
+├── examples/                  # Exemplos complementares
+├── scripts/                   # Scripts auxiliares
 ├── src/
 │   └── pyobliqua/
-│       ├── __main__.py       # Inicialização da interface
-│       ├── main.py           # Exemplos de cálculo por script
-│       ├── api.py            # API Python
+│       ├── __main__.py        # Inicialização da interface gráfica
+│       ├── main.py            # Exemplos de uso em scripts
+│       ├── api.py             # API do programa
 │       ├── analise/
 │       ├── materiais/
 │       ├── secao/
 │       ├── interface/
 │       └── visualizacao/
-└── tests/
+└── tests/                     # Testes automatizados
 ```
 
-## Referência
+O projeto conta também com uma **apresentação em Marp**, destinada à explicação da metodologia de cálculo e à demonstração do programa.
 
-A metodologia de cálculo tem como referência os trabalhos de **Américo Campos Filho** sobre dimensionamento de seções de concreto armado à flexão composta oblíqua.
+## 6. Referências
 
-## Autoria e uso
+A metodologia de cálculo é baseada nos trabalhos de **Américo Campos Filho (2014)** sobre dimensionamento de seções de concreto armado submetidas à flexão composta oblíqua.
+
+## 7. Autoria e Uso
 
 **Felipe Quevedo** — desenvolvimento do Pyobliqua.
 
-O programa destina-se ao **ensino e à pesquisa**. Os resultados devem ser verificados independentemente e não substituem as normas técnicas aplicáveis. Consulte o arquivo [LICENSE](LICENSE) para as condições de uso.
+O programa destina-se ao **ensino e à pesquisa**. Seus resultados devem ser verificados independentemente e não substituem as normas técnicas aplicáveis. Consulte o arquivo [LICENSE](LICENSE) para as condições de uso.
 
-> As instruções para instalação do programa no Windows serão acrescentadas quando o instalador com **Inno Setup** estiver disponível.
+> As instruções de instalação no Windows serão acrescentadas após a preparação do instalador com Inno Setup.

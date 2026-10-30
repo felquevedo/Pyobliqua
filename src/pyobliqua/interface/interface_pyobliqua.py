@@ -252,6 +252,14 @@ class Interface(tk.Tk):
         """Inicializa a janela, o estado da interface e o exemplo 5.1.
         """
         super().__init__()
+        # Ícone da janela (independente do ícone embutido no .exe).
+        # O PyInstaller inclui assets por meio de --collect-data pyobliqua.
+        icone = Path(__file__).resolve().parents[1] / 'assets' / 'pyobliqua.ico'
+        if icone.is_file():
+            try:
+                self.iconbitmap(str(icone))
+            except tk.TclError:
+                pass  # Não impede a abertura caso o sistema não aceite o .ico.
         self._caminho_arquivo = None
         self._atualizar_titulo()
         self.geometry('1450x850')
