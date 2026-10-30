@@ -2,7 +2,7 @@
 
 Execute na raiz do projeto: python interface_pyobliqua.py
 Dependências: numpy, scipy, matplotlib; tkinter da instalação Python.
-Unidades de entrada: cm, MPa, kN, kN.m e cm².
+Unidades de entrada: cm, cm² e unidades configuráveis de força, momento e tensão.
 Internamente os módulos de cálculo continuam usando mm e mm².
 """
 import json
@@ -17,6 +17,8 @@ import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
+from pyobliqua._version import __version__
+from pyobliqua.unidades import Unidades
 from pyobliqua.secao.secao import Secao
 from pyobliqua.secao.barra import Barra
 from pyobliqua.materiais.concreto import Concreto
@@ -162,7 +164,7 @@ class Tabela(ttk.Frame):
         entrada.bind('<Escape>', lambda e: fechar(False))
 
 
-def desenhar_diagramas_deformacoes_tensoes(ax, secao, estado, concreto):
+def desenhar_diagramas_deformacoes_tensoes(ax, secao, estado, concreto, unidades=None):
     """Diagramas ao lado da seção, com eixo longitudinal normal à linha neutra.
 
     O diagrama de tensões representa somente o concreto (tração desprezada).
@@ -228,7 +230,9 @@ def desenhar_diagramas_deformacoes_tensoes(ax, secao, estado, concreto):
                         bbox=dict(facecolor='white', alpha=.82, edgecolor='none', pad=1))
 
     pts_eps = plotar_diagrama(0, deformacoes * 1000, '#15803d', 'Deformações', '‰')
-    pts_sig = plotar_diagrama(1, tensoes, '#b91c1c', 'Tensões no concreto', 'MPa')
+    unidades = unidades or Unidades()
+    pts_sig = plotar_diagrama(1, np.array([unidades.de_interno(v, 'tensao') for v in tensoes]),
+                             '#b91c1c', 'Tensões no concreto', unidades.tensao)
     conjunto = np.vstack([pontos, pts_eps, pts_sig])
     borda = .16 * dim
     ax.set_xlim(min(conjunto[:, 0]) - borda, max(conjunto[:, 0]) + borda)
@@ -248,11 +252,18 @@ class Interface(tk.Tk):
         """Inicializa a janela, o estado da interface e o exemplo 5.1.
         """
         super().__init__()
-        self.title('Pyobliqua — Dimensionamento e verificação de seções')
+        self._caminho_arquivo = None
+        self._atualizar_titulo()
         self.geometry('1450x850')
         self.minsize(1100, 670)
         self.modo = tk.StringVar(value='dimensionamento')
         self.campos = {}
+        self.rotulos_campos = {}
+        self.unidade_forca = tk.StringVar(value="kN")
+        self.unidade_momento = tk.StringVar(value="kN.m")
+        self.unidade_tensao = tk.StringVar(value="MPa")
+        self._unidades_anteriores = Unidades()
+        self._alteracao_programatica = False
         self._ocupado = False
         self.mostrar_diagramas = tk.BooleanVar(value=True)
         self.mostrar_interacao = tk.BooleanVar(value=False)
@@ -261,6 +272,14 @@ class Interface(tk.Tk):
         self._montar()
         self._montar_menu()
         self.carregar_exemplo_51()
+
+    def _atualizar_titulo(self):
+        """Exibe o caminho do .dad somente quando há um arquivo associado."""
+        titulo = ('Pyobliqua - Dimensionamento e verificação de seções '
+                  'de concreto armado submetido a flexão composta')
+        if self._caminho_arquivo is not None:
+            titulo += f' - {self._caminho_arquivo}'
+        self.title(titulo)
 
     def _montar_menu(self):
         """Acrescenta a barra de menus sem alterar os painéis existentes."""
@@ -287,6 +306,9 @@ class Interface(tk.Tk):
             'formato': 'Pyobliqua-DAD',
             'versao': 1,
             'unidades_geometria': 'cm',
+            'unidades': {'forca': self.unidade_forca.get(),
+                         'momento': self.unidade_momento.get(),
+                         'tensao': self.unidade_tensao.get()},
             'modo': self.modo.get(),
             'mostrar_interacao': self.mostrar_interacao.get(),
             'campos': {nome: var.get() for nome, var in self.campos.items()},
@@ -300,6 +322,9 @@ class Interface(tk.Tk):
         self.modo.set('verificacao' if dados['modo'] == 'interacao' else dados['modo'])
         self.mostrar_interacao.set(bool(dados.get('mostrar_interacao', dados['modo'] == 'interacao')))
         self.atualizar_modo()
+        # Dados legados usam kN, kN.m e MPa. Preservar os valores originais.
+        u = dados.get('unidades', {'forca': 'kN', 'momento': 'kN.m', 'tensao': 'MPa'})
+        self._selecionar_unidades(Unidades(**u))
         self._definir(**dados['campos'])
         # Arquivos antigos .dad (sem marcador) armazenavam mm e mm².
         # Converte apenas na leitura; novos arquivos são salvos em cm e cm².
@@ -335,6 +360,10 @@ class Interface(tk.Tk):
             raise ValueError('Modo de análise inválido no arquivo.')
         if dados.get('unidades_geometria', 'mm') not in ('mm', 'cm'):
             raise ValueError('Unidades geométricas inválidas no arquivo.')
+        try:
+            Unidades(**dados.get('unidades', {'forca': 'kN', 'momento': 'kN.m', 'tensao': 'MPa'}))
+        except (TypeError, ValueError) as exc:
+            raise ValueError('Unidades inválidas no arquivo.') from exc
         campos = dados.get('campos')
         esperados = {'fck (MPa)', 'fyk (MPa)', 'Es (MPa)', 'γc', 'γs',
                      'Nad (kN)', 'Maxd (kN·m)', 'Mayd (kN·m)'}
@@ -368,6 +397,8 @@ class Interface(tk.Tk):
         self.canvas_figura.draw_idle()
         self._escrever('Novo projeto. Preencha os dados de entrada.\n')
         self.status.set('Pronto.')
+        self._caminho_arquivo = None
+        self._atualizar_titulo()
 
     def salvar_dados(self):
         """Salva exclusivamente as entradas em arquivo de texto .dad (UTF-8)."""
@@ -386,6 +417,8 @@ class Interface(tk.Tk):
         except OSError as exc:
             messagebox.showerror('Erro ao salvar', str(exc))
             return
+        self._caminho_arquivo = str(Path(caminho).resolve())
+        self._atualizar_titulo()
         self.status.set('Dados de entrada salvos.')
 
     def abrir_dados(self):
@@ -406,6 +439,8 @@ class Interface(tk.Tk):
             messagebox.showerror('Erro ao abrir', str(exc))
             return
         self._aplicar_entradas(dados)
+        self._caminho_arquivo = str(Path(caminho).resolve())
+        self._atualizar_titulo()
         self.status.set('Dados de entrada carregados.')
 
     def fechar_programa(self):
@@ -461,7 +496,7 @@ class Interface(tk.Tk):
         informacoes.pack(side='left', fill='both', expand=True)
         ttk.Label(informacoes, text='Pyobliqua',
                   font=('Arial', 16, 'bold')).pack(anchor='w', pady=(0, 8))
-        ttk.Label(informacoes, text='Versão 2026.1').pack(anchor='w', pady=2)
+        ttk.Label(informacoes, text=f'Versão {__version__}').pack(anchor='w', pady=2)
         ttk.Label(informacoes, text='Desenvolvedor: Prof. Felipe Quevedo').pack(anchor='w', pady=2)
 
         email = 'motta.quevedo@ufrgs.br'
@@ -512,7 +547,9 @@ class Interface(tk.Tk):
                 tk.StringVar: Variável associada ao campo.
             
         """
-        ttk.Label(parent, text=rotulo).grid(row=linha, column=coluna * 2, sticky='w', padx=(8, 2), pady=4)
+        etiqueta = ttk.Label(parent, text=rotulo)
+        etiqueta.grid(row=linha, column=coluna * 2, sticky='w', padx=(8, 2), pady=4)
+        self.rotulos_campos[rotulo] = etiqueta
         var = tk.StringVar(value=str(valor))
         ttk.Entry(parent, textvariable=var, width=largura).grid(
             row=linha, column=coluna * 2 + 1, sticky='ew', padx=(0, 9), pady=4)
@@ -531,10 +568,20 @@ class Interface(tk.Tk):
         cabecalho = ttk.Frame(corpo)
         cabecalho.pack(fill='x')
         ttk.Label(cabecalho, text='Pyobliqua', font=('Arial', 17, 'bold')).pack(side='left')
-        ttk.Label(cabecalho, text='cm | MPa | kN | kN·m | cm²').pack(side='left', padx=12)
         ttk.Button(cabecalho, text='Carregar exemplo 5.1', command=self.carregar_exemplo_51).pack(side='right', padx=3)
         ttk.Button(cabecalho, text='Carregar exemplo 5.2', command=self.carregar_exemplo_52).pack(side='right', padx=3)
 
+        selecao = ttk.LabelFrame(corpo, text='Unidades de entrada e saída (geometria: cm, cm², cm⁴)', padding=4)
+        selecao.pack(fill='x', pady=(5, 0))
+        for titulo, variavel, opcoes in (
+            ('Força:', self.unidade_forca, ('kN', 'kgf', 'tf')),
+            ('Momento:', self.unidade_momento, ('kN.m', 'kgf.m', 'tf.m')),
+            ('Tensão:', self.unidade_tensao, ('MPa', 'kN/cm²', 'kgf/cm²', 'tf/cm²')),
+        ):
+            ttk.Label(selecao, text=titulo).pack(side='left', padx=(8, 3))
+            ttk.Combobox(selecao, textvariable=variavel, values=opcoes,
+                         state='readonly', width=11).pack(side='left', padx=(0, 12))
+            variavel.trace_add('write', self._unidades_alteradas)
         superior = ttk.Frame(corpo)
         superior.pack(fill='x', pady=(5, 5))
         modo_frame = ttk.LabelFrame(superior, text='Tipo de análise', padding=4)
@@ -618,6 +665,73 @@ class Interface(tk.Tk):
         self.toolbar.pack(side='left', fill='x')
         self.atualizar_modo()
         self.after(150, lambda: paineis.sashpos(0, max(420, int(paineis.winfo_width()*0.42))))
+        self._atualizar_rotulos_unidades()
+
+    def _unidades(self):
+        return Unidades(forca=self.unidade_forca.get(),
+                        momento=self.unidade_momento.get(),
+                        tensao=self.unidade_tensao.get())
+
+    def _atualizar_rotulos_unidades(self):
+        u = self._unidades()
+        for chave, grandeza in (('fck (MPa)', 'tensao'), ('fyk (MPa)', 'tensao'),
+                                 ('Es (MPa)', 'tensao'), ('Nad (kN)', 'forca'),
+                                 ('Maxd (kN·m)', 'momento'), ('Mayd (kN·m)', 'momento')):
+            prefixo = chave.split(' (')[0]
+            unidade = u.unidade(grandeza).replace('.m', '·m')
+            self.rotulos_campos[chave].configure(text=f'{prefixo} ({unidade})')
+
+    def _selecionar_unidades(self, unidades):
+        self._alteracao_programatica = True
+        try:
+            self.unidade_forca.set(unidades.forca)
+            self.unidade_momento.set(unidades.momento)
+            self.unidade_tensao.set(unidades.tensao)
+            self._unidades_anteriores = unidades
+            self._atualizar_rotulos_unidades()
+        finally:
+            self._alteracao_programatica = False
+
+    def _unidades_alteradas(self, *_):
+        if self._alteracao_programatica:
+            return
+        if not hasattr(self, 'rotulos_campos') or not self.rotulos_campos or self._ocupado:
+            if self._ocupado:
+                self._selecionar_unidades(self._unidades_anteriores)
+            return
+        try:
+            novas = self._unidades()
+        except ValueError:
+            return
+        antigas = self._unidades_anteriores
+        if novas == antigas:
+            return
+        chaves = {'tensao': ('fck (MPa)', 'fyk (MPa)', 'Es (MPa)'),
+                  'forca': ('Nad (kN)',),
+                  'momento': ('Maxd (kN·m)', 'Mayd (kN·m)')}
+        alterados = {}
+        try:
+            for grandeza, nomes in chaves.items():
+                for nome in nomes:
+                    valor = self.campos[nome].get().strip()
+                    if valor:
+                        valor_interno = antigas.para_interno(numero(valor, nome), grandeza)
+                        alterados[nome] = f'{novas.de_interno(valor_interno, grandeza):.12g}'
+        except ValueError as exc:
+            messagebox.showerror('Conversão de unidades',
+                f'Corrija os campos numéricos antes de trocar as unidades.\n{exc}')
+            self._selecionar_unidades(antigas)
+            return
+        for nome, valor in alterados.items():
+            self.campos[nome].set(valor)
+        self._unidades_anteriores = novas
+        self._atualizar_rotulos_unidades()
+        # Os gráficos e relatórios anteriores usam as unidades da execução anterior.
+        self._ultimo = None
+        self._ultimo_interacao = None
+        self.eixo_figura.clear()
+        self.canvas_figura.draw_idle()
+        self._escrever('Unidades atualizadas. Execute o cálculo para atualizar os resultados.\n')
 
     def atualizar_modo(self):
         """Atualiza a instrução sobre áreas conforme o modo selecionado.
@@ -660,8 +774,11 @@ class Interface(tk.Tk):
             materiais e esforços solicitantes.
             
         """
+        self._caminho_arquivo = None
+        self._atualizar_titulo()
         self.modo.set('dimensionamento')
         self.atualizar_modo()
+        self._selecionar_unidades(Unidades())
         self._definir(**{'fck (MPa)': 20, 'fyk (MPa)': 500, 'Es (MPa)': 210000,
                          'γc': 1.4, 'γs': 1.15, 'Nad (kN)': -200,
                          'Maxd (kN·m)': -500, 'Mayd (kN·m)': 500})
@@ -680,8 +797,11 @@ class Interface(tk.Tk):
             Preenche seção poligonal e armaduras com áreas individuais.
             
         """
+        self._caminho_arquivo = None
+        self._atualizar_titulo()
         self.modo.set('verificacao')
         self.atualizar_modo()
+        self._selecionar_unidades(Unidades())
         self._definir(**{'fck (MPa)': 20, 'fyk (MPa)': 500, 'Es (MPa)': 210000,
                          'γc': 1.4, 'γs': 1.15, 'Nad (kN)': 0,
                          'Maxd (kN·m)': -1000, 'Mayd (kN·m)': 0})
@@ -785,12 +905,13 @@ class Interface(tk.Tk):
             barras = [Barra(x,y,proporcao=a/As) for x,y,a in dados_barras]
         secao = Secao(contorno=[tuple(p) for p in contorno],
                       furos=list(furos.values()), barras=barras)
-        concreto = Concreto(fck=valores['fck (MPa)'], gamma_c=valores['γc'])
-        aco = Aco(fyk=valores['fyk (MPa)'], gamma_s=valores['γs'],
-                  es=valores['Es (MPa)'])
-        esforcos = (valores['Nad (kN)']*1e3,
-                    valores['Maxd (kN·m)']*1e6,
-                    valores['Mayd (kN·m)']*1e6)
+        concreto = Concreto(fck=self._unidades().para_interno(valores['fck (MPa)'], 'tensao'), gamma_c=valores['γc'])
+        aco = Aco(fyk=self._unidades().para_interno(valores['fyk (MPa)'], 'tensao'), gamma_s=valores['γs'],
+                  es=self._unidades().para_interno(valores['Es (MPa)'], 'tensao'))
+        u = self._unidades()
+        esforcos = (u.para_interno(valores['Nad (kN)'], 'forca'),
+                    u.para_interno(valores['Maxd (kN·m)'], 'momento'),
+                    u.para_interno(valores['Mayd (kN·m)'], 'momento'))
         return secao, concreto, aco, esforcos, As, modo
 
     def _atualizar_diagramas(self):
@@ -830,8 +951,9 @@ class Interface(tk.Tk):
         desenhar_secao(secao, area_total=As, estado=estado, esforcos=esforcos,
                        tipo_esforcos=tipo, titulo=titulo, salvar_em=salvar_em,
                        numerar_barras=True, ax=self.eixo_figura, mostrar=False)
+        self._converter_anotacoes_esforcos()
         if self.mostrar_diagramas.get() and estado is not None and concreto is not None:
-            desenhar_diagramas_deformacoes_tensoes(self.eixo_figura, secao, estado, concreto)
+            desenhar_diagramas_deformacoes_tensoes(self.eixo_figura, secao, estado, concreto, self._unidades())
         # Coloca a legenda fora da área de dados, evitando cobrir a seção.
         legenda = self.eixo_figura.get_legend()
         if legenda is not None:
@@ -846,8 +968,24 @@ class Interface(tk.Tk):
         self.eixo_figura.yaxis.set_major_formatter(FuncFormatter(lambda valor, _: f'{valor/10:g}'))
         self.eixo_figura.set_xlabel('x (cm)')
         self.eixo_figura.set_ylabel('y (cm)')
-        self.figura.subplots_adjust(bottom=0.23)
+        self.figura.subplots_adjust(left=0.12, right=0.97, bottom=0.23)
         self.canvas_figura.draw_idle()
+
+    def _converter_anotacoes_esforcos(self):
+        """Converte anotações do desenhar_secao (que usa kN e kN·m)."""
+        import re
+        u = self._unidades()
+        for texto in self.eixo_figura.texts:
+            original = texto.get_text()
+            padrao = r'(?P<numero>[+-]?\d+(?:[.,]\d+)?)\s*(?P<unidade>kN·m|kN)'
+            def converter(m):
+                grandeza = 'momento' if m.group('unidade') == 'kN·m' else 'forca'
+                valor = float(m.group('numero').replace(',', '.'))
+                interno = Unidades().para_interno(valor, grandeza)
+                destino = u.de_interno(interno, grandeza)
+                simbolo = u.unidade(grandeza).replace('.m', '·m')
+                return f'{destino:+.2f} {simbolo}'
+            texto.set_text(re.sub(padrao, converter, original))
 
     def visualizar(self):
         """Exibe geometria e esforços solicitantes sem resolver o equilíbrio.
@@ -935,6 +1073,7 @@ class Interface(tk.Tk):
                 plot_esforcos = esforcos if modo == 'dimensionamento' else None
                 tipo = 'solicitantes' if modo == 'dimensionamento' else 'resistentes'
                 titulo = 'NÃO HOUVE CONVERGÊNCIA'
+            u = self._unidades()
             linhas = [
                 f'Modo: {modo}',
                 f'Convergência: {"SIM" if sucesso else "NÃO"}',
@@ -962,9 +1101,9 @@ class Interface(tk.Tk):
                 ])
                 if lam is not None:
                     linhas.append(f'λ = {lam:.8f} — {"reserva inferior a 1" if lam < 1 else "reserva não inferior a 1"}')
-                linhas.extend([f'Nr = {resistentes[0]/1e3:+.6f} kN',
-                               f'Mrx = {resistentes[1]/1e6:+.6f} kN·m',
-                               f'Mry = {resistentes[2]/1e6:+.6f} kN·m'])
+                linhas.extend([f'Nr = {u.de_interno(resistentes[0], 'forca'):+.6f} {u.forca}',
+                               f'Mrx = {u.de_interno(resistentes[1], 'momento'):+.6f} {u.momento.replace(".m", "·m")}',
+                               f'Mry = {u.de_interno(resistentes[2], 'momento'):+.6f} {u.momento.replace(".m", "·m")}'])
             else:
                 linhas.append('Sem linha neutra nem esforços resistentes validados.')
             linhas.append(f'Norma dos resíduos = {getattr(r,"norma_residuos",float("nan")):.3e}')
@@ -1016,7 +1155,15 @@ class Interface(tk.Tk):
             self.eixo_figura, resultado,
             momento_solicitante=(esforcos[1], esforcos[2]),
             aproveitamento=estimativa)
-        self.figura.subplots_adjust(bottom=.22)
+        # O módulo de desenho usa kN·m nos eixos; converter apenas os rótulos.
+        u = self._unidades()
+        fator = Unidades().para_interno(1, 'momento')
+        conversor = lambda v, _: f'{u.de_interno(v * fator, "momento"):g}'
+        self.eixo_figura.xaxis.set_major_formatter(FuncFormatter(conversor))
+        self.eixo_figura.yaxis.set_major_formatter(FuncFormatter(conversor))
+        self.eixo_figura.set_xlabel(f'Mx ({u.momento.replace(".m", "·m")})')
+        self.eixo_figura.set_ylabel(f'My ({u.momento.replace(".m", "·m")})')
+        self.figura.subplots_adjust(left=0.17, right=0.97, bottom=0.22)
         self.canvas_figura.draw_idle()
 
     def _finalizar_interacao(self, resultado, esforcos, As, secao):
@@ -1026,10 +1173,10 @@ class Interface(tk.Tk):
         self.status.set('Diagrama calculado.' if n_pontos else 'Nenhum estado encontrado.')
         linhas = [
             'DIAGRAMA DE INTERAÇÃO Mx–My',
-            f'N fixo = {esforcos[0]/1e3:+.3f} kN',
+            f'N fixo = {self._unidades().de_interno(esforcos[0], 'forca'):+.3f} {self.unidade_forca.get()}',
             f'As total = {As/100:.3f} cm²',
-            f'Mx solicitante = {esforcos[1]/1e6:+.3f} kN·m',
-            f'My solicitante = {esforcos[2]/1e6:+.3f} kN·m',
+            f'Mx solicitante = {self._unidades().de_interno(esforcos[1], 'momento'):+.3f} {self.unidade_momento.get()}',
+            f'My solicitante = {self._unidades().de_interno(esforcos[2], 'momento'):+.3f} {self.unidade_momento.get()}',
             f'Área geométrica = {secao.area/100:.3f} cm²',
             f'Centroide = ({secao.xc/10:.3f}; {secao.yc/10:.3f}) cm',
             f'Estados resistentes encontrados = {n_pontos}',
@@ -1041,8 +1188,8 @@ class Interface(tk.Tk):
         if estimativa.confiavel_para_interpolacao:
             linhas.extend([
                 f'λ estimado = {estimativa.lambda_estimado:.6f}',
-                f'Mrx interpolado = {estimativa.Mx_resistente/1e6:+.3f} kN·m',
-                f'Mry interpolado = {estimativa.My_resistente/1e6:+.3f} kN·m',
+                f'Mrx interpolado = {self._unidades().de_interno(estimativa.Mx_resistente, 'momento'):+.3f} {self.unidade_momento.get()}',
+                f'Mry interpolado = {self._unidades().de_interno(estimativa.My_resistente, 'momento'):+.3f} {self.unidade_momento.get()}',
             ])
         else:
             linhas.append('λ não determinado pela interpolação radial.')
