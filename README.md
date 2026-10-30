@@ -21,9 +21,7 @@ Baixe o instalador na página de versões do projeto:
 
 [**Baixar Pyobliqua para Windows**](https://github.com/felquevedo/Pyobliqua/releases/latest)
 
-Execute o instalador e siga as instruções.
-
-Não é necessário instalar Python.
+Execute o instalador e siga as instruções. Não é necessário instalar Python.
 
 ## 3. Abrir a interface gráfica usando o Python
 
@@ -86,11 +84,17 @@ Pyobliqua/
 
 O projeto conta também com uma **apresentação em Marp**, destinada à explicação da metodologia de cálculo e à demonstração do programa.
 
-## 6. Referências
+## 6. Referências e Escopo
 
-A metodologia de cálculo é baseada nos trabalhos de **Américo Campos Filho (2014)** sobre dimensionamento de seções de concreto armado submetidas à flexão composta oblíqua.
+CAMPOS FILHO, Américo. *Dimensionamento e verificação de seções poligonais de concreto armado submetidas à flexão composta oblíqua*. UFRGS, 2014. Capítulos 1–5 e Anexo A.
 
-## 7. Autoria e Uso
+ASSOCIAÇÃO BRASILEIRA DE NORMAS TÉCNICAS. *ABNT NBR 6118:2014: Projeto de estruturas de concreto*.
+
+MVREAL. FCO. GitHub, [s. d.]. Disponível em: https://github.com/mvreal/FCO. Acesso em: 14 out. 2026.
+
+> O conteúdo normativo desta apresentação segue a referência de 2014. O programa é apresentado como ferramenta acadêmica em desenvolvimento, com validação numérica independente pendente.
+
+## 7. Autoria e licença
 
 **Felipe Quevedo** — desenvolvimento do Pyobliqua.
 
