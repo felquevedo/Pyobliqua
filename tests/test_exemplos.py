@@ -1,18 +1,13 @@
-"""Testes de regressão dos resultados conhecidos; não substituem validação independente."""
+"""Testes de regressão dos exemplos; não substituem validação independente."""
 import subprocess
 import sys
 
-import pytest
 
-
-@pytest.mark.parametrize(
-    "exemplo, esperado",
-    [("5.1", "As = 37.28896 cm²"), ("5.2", "lambda = 0.93460410")],
-)
-def test_exemplos_conhecidos(exemplo, esperado):
+def test_exemplos_conhecidos():
     resultado = subprocess.run(
-        [sys.executable, "-m", "pyobliqua.main", "--exemplo", exemplo],
+        [sys.executable, "-m", "pyobliqua.main"],
         capture_output=True, text=True, check=True, timeout=90,
     )
-    assert "Convergencia: True" in resultado.stdout
-    assert esperado in resultado.stdout
+    assert resultado.stdout.count("Convergencia: True") == 2
+    assert "As = 37.28896 cm²" in resultado.stdout
+    assert "lambda = 0.93460410" in resultado.stdout
