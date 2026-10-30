@@ -4,16 +4,7 @@
 
 O **Pyobliqua** é um programa desenvolvido em Python para fins acadêmicos. Pode ser utilizado por meio de uma **interface gráfica** ou diretamente em **scripts Python**.
 
-## 1. Instalação no Windows
-
-Baixe a versão mais recente do instalador:
-
-[**Download do Pyobliqua**](https://github.com/SEU_USUARIO/SEU_REPOSITORIO/releases/latest)
-
-Execute o instalador e siga as instruções.
-Não é necessário instalar Python.
-
-## 2. Funcionalidades
+## 1. Funcionalidades
 
 - Dimensionamento da armadura de seções poligonais de concreto armado.
 - Verificação de seções com armadura conhecida.
@@ -21,6 +12,18 @@ Não é necessário instalar Python.
 - Visualização da seção transversal, linha neutra, deformações e tensões.
 - Geração do diagrama de interação **Mx–My**.
 - Leitura e gravação dos dados da interface em arquivos `.dad`.
+
+O projeto conta também com uma [**Apresentação em pdf**](https://github.com/felquevedo/Pyobliqua/blob/main/docs/apresentacao/pyobliqua_metodologia_2014_marp.pdf), destinada à explicação da metodologia de cálculo e à demonstração do programa.
+
+## 2. Instalação no Windows
+
+Baixe o instalador na página de versões do projeto:
+
+[**Baixar Pyobliqua para Windows**](https://github.com/felquevedo/Pyobliqua/releases/latest)
+
+Execute o instalador e siga as instruções.
+
+Não é necessário instalar Python.
 
 ## 3. Abrir a interface gráfica usando o Python
 
@@ -92,5 +95,3 @@ A metodologia de cálculo é baseada nos trabalhos de **Américo Campos Filho (2
 **Felipe Quevedo** — desenvolvimento do Pyobliqua.
 
 O programa destina-se ao **ensino e à pesquisa**. Seus resultados devem ser verificados independentemente e não substituem as normas técnicas aplicáveis. Consulte o arquivo [LICENSE](LICENSE) para as condições de uso.
-
-> As instruções de instalação no Windows serão acrescentadas após a preparação do instalador com Inno Setup.
