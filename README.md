@@ -4,13 +4,16 @@
 
 O **Pyobliqua** é um programa desenvolvido em Python para fins acadêmicos. Pode ser utilizado por meio de uma **interface gráfica** ou diretamente em **scripts Python**.
 
+O projeto conta também com uma [**Apresentação em pdf**](https://github.com/felquevedo/Pyobliqua/blob/main/docs/apresentacao/pyobliqua_metodologia_2014_marp.pdf), destinada à explicação da metodologia de cálculo e à demonstração do programa.
+
 ## 1. Instalação no Windows
 
-Baixe a versão mais recente do instalador:
+Baixe o instalador na página de versões do projeto:
 
-[**Download do Pyobliqua**](https://github.com/SEU_USUARIO/SEU_REPOSITORIO/releases/latest)
+[**Baixar Pyobliqua para Windows**](https://github.com/felquevedo/Pyobliqua/releases/latest)
 
 Execute o instalador e siga as instruções.
+
 Não é necessário instalar Python.
 
 ## 2. Funcionalidades
