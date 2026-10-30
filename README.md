@@ -1,91 +1,96 @@
 # Pyobliqua
 
-**Análise de seções poligonais de concreto armado à flexão composta oblíqua — projeto acadêmico em Python.**
+**Dimensionamento e verificação de seções de concreto armado submetidas à flexão composta oblíqua.**
 
-O Pyobliqua é um programa desenvolvido para fins de **ensino, estudo e pesquisa**. Permite estudar o comportamento resistente de seções poligonais de concreto armado submetidas à força normal e a momentos fletores em duas direções.
+O **Pyobliqua** é um programa desenvolvido em Python para fins acadêmicos. Pode ser utilizado por meio de uma **interface gráfica** ou diretamente em **scripts Python**.
 
-> **Aviso importante:** o Pyobliqua não é autorizado para dimensionamento ou verificação de estruturas em projetos profissionais. Os resultados devem ser conferidos de forma independente e não substituem a aplicação das normas técnicas vigentes. O programa é fornecido sem garantia, nos limites da legislação aplicável. Consulte o arquivo [LICENSE](LICENSE).
+## 1. Instalação no Windows
 
-## Funcionalidades
+Baixe a versão mais recente do instalador:
 
-- **Dimensionamento:** determinação da área total de armadura necessária para esforços normais e momentos fletores prescritos.
-- **Verificação:** avaliação de uma seção com armadura definida, incluindo o fator de reserva de resistência (λ).
-- **Geometria:** seções poligonais, incluindo contornos com furos, e posicionamento individual das barras.
-- **Visualização:** representação da seção, da linha neutra e de diagramas de deformação e tensão.
-- **Diagrama Mx–My:** cálculo e apresentação de estados resistentes para força normal constante e armadura conhecida ou dimensionada, com indicação dos momentos solicitantes.
-- **Uso por código:** execução dos exemplos 5.1 e 5.2 sem a interface gráfica.
+[**Download do Pyobliqua**](https://github.com/SEU_USUARIO/SEU_REPOSITORIO/releases/latest)
 
-**Atenção:** a curva Mx–My é obtida numericamente por amostragem de orientações da linha neutra. Sua representação gráfica e a interpolação radial não substituem a verificação numérica completa, nem garantem a identificação de todos os ramos resistentes em situações gerais.
+Execute o instalador e siga as instruções.
+Não é necessário instalar Python.
 
-## Organização do projeto
+## 2. Funcionalidades
+
+- Dimensionamento da armadura de seções poligonais de concreto armado.
+- Verificação de seções com armadura conhecida.
+- Representação de seções poligonais, incluindo furos e barras de aço.
+- Visualização da seção transversal, linha neutra, deformações e tensões.
+- Geração do diagrama de interação **Mx–My**.
+- Leitura e gravação dos dados da interface em arquivos `.dad`.
+
+## 3. Abrir a interface gráfica usando o Python
+
+Com o projeto configurado no ambiente Python, execute na raiz do repositório:
+
+```powershell
+python -m pyobliqua
+```
+
+A interface permite informar a geometria, as propriedades dos materiais e os esforços solicitantes, realizar os cálculos e visualizar os resultados.
+
+![Janela principal do Pyobliqua](docs/images/janela.png)
+
+## 4. Utilizar em scripts Python
+
+O arquivo **`main.py`** contém exemplos de **dimensionamento** (Exemplo 5.1) e **verificação** (Exemplo 5.2). Ele pode ser usado como ponto de partida para criar outros estudos e automatizar cálculos.
+
+**[Consultar ou baixar o arquivo main.py](src/pyobliqua/main.py)** — no GitHub, abra o link e utilize **Download raw file** para salvá-lo.
+
+Para executar os exemplos:
+
+```powershell
+python -m pyobliqua.main
+```
+
+Também é possível utilizar a API do pacote em scripts próprios:
+
+```python
+from pyobliqua import Modelo, Unidades
+
+modelo = Modelo(Unidades(forca="kN", momento="kN.m", tensao="MPa"))
+
+# Defina a seção e os materiais como nos exemplos do main.py.
+# resultado = modelo.dimensionar(secao, concreto, aco, Nsd, Msdx, Msdy)
+# resultado = modelo.verificar(secao, concreto, aco, As=As, Nsd=Nsd, Msdx=Msdx, Msdy=Msdy)
+```
+
+## 5. Estrutura principal do repositório
 
 ```text
 Pyobliqua/
-├── analise/                 # Equilíbrio, esforços, deformações, verificação e interação
-├── materiais/               # Modelos de concreto e aço
-├── secao/                   # Geometria da seção e barras de armadura
-├── visualizacao/            # Desenho da seção e diagrama de interação
-├── testes/                  # Casos e exemplos de comparação
-├── interface_pyobliqua.py   # Interface gráfica (Tkinter)
-├── main.py                  # Demonstração sem interface gráfica
-├── logo_ufrgs.png
 ├── README.md
-└── LICENSE
+├── pyproject.toml
+├── docs/
+│   └── apresentacao/          # Apresentação em Marp
+├── examples/                  # Exemplos complementares
+├── scripts/                   # Scripts auxiliares
+├── src/
+│   └── pyobliqua/
+│       ├── __main__.py        # Inicialização da interface gráfica
+│       ├── main.py            # Exemplos de uso em scripts
+│       ├── api.py             # API do programa
+│       ├── analise/
+│       ├── materiais/
+│       ├── secao/
+│       ├── interface/
+│       └── visualizacao/
+└── tests/                     # Testes automatizados
 ```
 
-## Requisitos
+O projeto conta também com uma **apresentação em Marp**, destinada à explicação da metodologia de cálculo e à demonstração do programa.
 
-- Python 3.10 ou superior (recomendado).
-- Bibliotecas Python: `numpy`, `scipy` e `matplotlib`.
-- `tkinter` para a interface gráfica (normalmente incluído na instalação do Python para Windows).
+## 6. Referências
 
-Instale as dependências na pasta do projeto:
+A metodologia de cálculo é baseada nos trabalhos de **Américo Campos Filho (2014)** sobre dimensionamento de seções de concreto armado submetidas à flexão composta oblíqua.
 
-```bash
-python -m pip install numpy scipy matplotlib
-```
-
-## Execução
-
-### Interface gráfica
-
-```bash
-python interface_pyobliqua.py
-```
-
-Na interface, selecione **Dimensionamento** ou **Verificação**, informe a geometria, as armaduras, os materiais e os esforços. O diagrama **Mx–My** pode ser habilitado por uma caixa de seleção nos dois modos. No dimensionamento, o diagrama usa a área de aço calculada; na verificação, usa a área de aço informada.
-
-### Exemplos pelo terminal
-
-```bash
-python main.py                 # Exemplos 5.1 e 5.2
-python main.py --exemplo 5.1   # Dimensionamento
-python main.py --exemplo 5.2   # Verificação
-python main.py --diagrama      # Exemplos com diagrama Mx–My
-```
-
-O **exemplo 5.1** demonstra o dimensionamento de uma seção vazada de 85 × 85 cm com 20 barras. O **exemplo 5.2** demonstra a verificação de uma seção assimétrica com 15 barras e área total de aço de 30 cm². Ambos são casos de estudo associados à referência acadêmica indicada abaixo.
-
-### Convenções de unidades
-
-Os módulos de cálculo trabalham internamente com **N, mm, N·mm, mm² e MPa**. A interface pode apresentar dados em **kN, kN·m, cm, cm² e cm⁴**. Observe as conversões ao usar diretamente as funções Python.
-
-## Referência técnica
-
-CAMPOS FILHO, Américo. *Dimensionamento de seções poligonais de concreto armado à flexão composta oblíqua*. Apostila, Universidade Federal do Rio Grande do Sul (UFRGS), 2000.
-
-O programa foi desenvolvido com base em conceitos e procedimentos apresentados nessa apostila. A referência é anterior às versões atuais das normas de concreto; **não se deve presumir conformidade automática com a ABNT NBR 6118 vigente**.
-
-A referência à UFRGS identifica o contexto acadêmico da obra utilizada e **não implica homologação ou garantia institucional do software**.
-
-## Licença e condições de uso
-
-O código-fonte é disponibilizado para **consulta e uso acadêmico não comercial**, sob as condições do arquivo [LICENSE](LICENSE). São permitidos estudos e modificações privadas; redistribuição de versões modificadas e usos comerciais exigem autorização prévia do titular.
-
-**Este projeto não é distribuído sob uma licença de software livre ou open source**, pois contém restrições de finalidade e redistribuição.
-
-## Autoria
+## 7. Autoria e Uso
 
 **Felipe Quevedo** — desenvolvimento do Pyobliqua.
 
-© 2026 Felipe Quevedo. Todos os direitos reservados.
+O programa destina-se ao **ensino e à pesquisa**. Seus resultados devem ser verificados independentemente e não substituem as normas técnicas aplicáveis. Consulte o arquivo [LICENSE](LICENSE) para as condições de uso.
+
+> As instruções de instalação no Windows serão acrescentadas após a preparação do instalador com Inno Setup.

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyobliqua"
+dynamic = ["version"]
+description = "Dimensionamento e verificação de seções de concreto armado sob flexão composta oblíqua"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = ["numpy", "scipy", "matplotlib"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+build = ["pyinstaller"]
+dev = ["pytest", "pyinstaller"]
+
+[project.scripts]
+pyobliqua-exemplos = "pyobliqua.main:main"
+
+[project.gui-scripts]
+pyobliqua = "pyobliqua.__main__:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "pyobliqua._version.__version__"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pyobliqua = ["logo_ufrgs.png"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
