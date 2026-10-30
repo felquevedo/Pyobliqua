@@ -16,7 +16,7 @@ A integração por recorte poligonal simples é destinada inicialmente
 a contornos convexos, conforme a limitação da implementação original.
 """
 
-from analise.integracao import (
+from pyobliqua.analise.integracao import (
     separar_regioes,
     integrar_poligono,
 )

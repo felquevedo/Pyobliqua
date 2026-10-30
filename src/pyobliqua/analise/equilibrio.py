@@ -19,8 +19,8 @@ import numpy as np
 from scipy.optimize import least_squares
 from math import pi
 
-from analise.estado_deformacao import EstadoDeformacao
-from analise.esforcos import esforcos_resistentes
+from pyobliqua.analise.estado_deformacao import EstadoDeformacao
+from pyobliqua.analise.esforcos import esforcos_resistentes
 
 
 def residuos_equilibrio(

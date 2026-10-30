@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pyobliqua"
+version = "0.1.0"
+description = "Analise de secoes poligonais de concreto armado sob flexao composta obliqua"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = ["numpy", "scipy", "matplotlib"]
+
+[project.optional-dependencies]
+test = ["pytest"]
+build = ["pyinstaller"]
+
+[project.scripts]
+pyobliqua-exemplos = "pyobliqua.main:main"
+
+[project.gui-scripts]
+pyobliqua = "pyobliqua.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+pyobliqua = ["logo_ufrgs.png"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

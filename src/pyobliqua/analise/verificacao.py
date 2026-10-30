@@ -21,8 +21,8 @@ normativas independentes.
 from math import pi
 import numpy as np
 from scipy.optimize import least_squares
-from analise.estado_deformacao import EstadoDeformacao
-from analise.esforcos import esforcos_resistentes
+from pyobliqua.analise.estado_deformacao import EstadoDeformacao
+from pyobliqua.analise.esforcos import esforcos_resistentes
 
 
 def resolver_verificacao(secao, concreto, aco, As, Nsd, Msdx, Msdy,

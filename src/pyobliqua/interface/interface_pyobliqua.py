@@ -17,17 +17,17 @@ import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 
-from secao.secao import Secao
-from secao.barra import Barra
-from materiais.concreto import Concreto
-from materiais.aco import Aco
-from analise.estado_deformacao import EstadoDeformacao
-from analise.esforcos import esforcos_resistentes
-from analise.equilibrio import resolver_equilibrio
-from analise.verificacao import resolver_verificacao
-from visualizacao.desenho_secao import desenhar_secao
-from analise.interacao import calcular_diagrama_interacao, estimar_aproveitamento_radial
-from visualizacao.diagrama_interacao import desenhar_diagrama_interacao
+from pyobliqua.secao.secao import Secao
+from pyobliqua.secao.barra import Barra
+from pyobliqua.materiais.concreto import Concreto
+from pyobliqua.materiais.aco import Aco
+from pyobliqua.analise.estado_deformacao import EstadoDeformacao
+from pyobliqua.analise.esforcos import esforcos_resistentes
+from pyobliqua.analise.equilibrio import resolver_equilibrio
+from pyobliqua.analise.verificacao import resolver_verificacao
+from pyobliqua.visualizacao.desenho_secao import desenhar_secao
+from pyobliqua.analise.interacao import calcular_diagrama_interacao, estimar_aproveitamento_radial
+from pyobliqua.visualizacao.diagrama_interacao import desenhar_diagrama_interacao
 
 
 def numero(texto, descricao):
@@ -442,7 +442,7 @@ class Interface(tk.Tk):
                                 relief='groove', borderwidth=1)
         espaco_logo.pack(side='left', fill='y', padx=(0, 20))
         espaco_logo.pack_propagate(False)
-        caminho_logo = Path(__file__).resolve().parent / 'logo_ufrgs.png'
+        caminho_logo = Path(__file__).resolve().parents[1] / 'logo_ufrgs.png'
         try:
             imagem = tk.PhotoImage(file=str(caminho_logo))
             fator = max(1, math.ceil(imagem.width() / 200),

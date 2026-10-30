@@ -19,19 +19,7 @@ O Pyobliqua é um programa desenvolvido para fins de **ensino, estudo e pesquisa
 
 ## Organização do projeto
 
-```text
-Pyobliqua/
-├── analise/                 # Equilíbrio, esforços, deformações, verificação e interação
-├── materiais/               # Modelos de concreto e aço
-├── secao/                   # Geometria da seção e barras de armadura
-├── visualizacao/            # Desenho da seção e diagrama de interação
-├── testes/                  # Casos e exemplos de comparação
-├── interface_pyobliqua.py   # Interface gráfica (Tkinter)
-├── main.py                  # Demonstração sem interface gráfica
-├── logo_ufrgs.png
-├── README.md
-└── LICENSE
-```
+O código-fonte fica em `src/pyobliqua/`, separado em `analise`, `materiais`, `secao`, `visualizacao` e `interface`. Os casos `.dad` estão em `examples/casos_dad/`; a apresentação Marp, em `docs/apresentacao/`. Veja [docs/ORGANIZACAO.md](docs/ORGANIZACAO.md).
 
 ## Requisitos
 
@@ -42,7 +30,7 @@ Pyobliqua/
 Instale as dependências na pasta do projeto:
 
 ```bash
-python -m pip install numpy scipy matplotlib
+python -m pip install -e .
 ```
 
 ## Execução
@@ -50,7 +38,7 @@ python -m pip install numpy scipy matplotlib
 ### Interface gráfica
 
 ```bash
-python interface_pyobliqua.py
+python -m pyobliqua
 ```
 
 Na interface, selecione **Dimensionamento** ou **Verificação**, informe a geometria, as armaduras, os materiais e os esforços. O diagrama **Mx–My** pode ser habilitado por uma caixa de seleção nos dois modos. No dimensionamento, o diagrama usa a área de aço calculada; na verificação, usa a área de aço informada.
@@ -58,10 +46,10 @@ Na interface, selecione **Dimensionamento** ou **Verificação**, informe a geom
 ### Exemplos pelo terminal
 
 ```bash
-python main.py                 # Exemplos 5.1 e 5.2
-python main.py --exemplo 5.1   # Dimensionamento
-python main.py --exemplo 5.2   # Verificação
-python main.py --diagrama      # Exemplos com diagrama Mx–My
+python -m pyobliqua.main                 # Exemplos 5.1 e 5.2
+python -m pyobliqua.main --exemplo 5.1   # Dimensionamento
+python -m pyobliqua.main --exemplo 5.2   # Verificação
+python -m pyobliqua.main --diagrama      # Exemplos com diagrama Mx–My
 ```
 
 O **exemplo 5.1** demonstra o dimensionamento de uma seção vazada de 85 × 85 cm com 20 barras. O **exemplo 5.2** demonstra a verificação de uma seção assimétrica com 15 barras e área total de aço de 30 cm². Ambos são casos de estudo associados à referência acadêmica indicada abaixo.
@@ -89,3 +77,16 @@ O código-fonte é disponibilizado para **consulta e uso acadêmico não comerci
 **Felipe Quevedo** — desenvolvimento do Pyobliqua.
 
 © 2026 Felipe Quevedo. Todos os direitos reservados.
+
+## Testes e distribuição
+
+Instale os extras de teste e execute:
+
+```powershell
+python -m pip install -e ".[test]"
+python -m pytest
+```
+
+No Windows, execute `scripts\gerar_executavel.bat` para gerar `dist\Pyobliqua.exe` com PyInstaller. O ponto de entrada da interface é `src/pyobliqua/__main__.py`; o PyInstaller utiliza `scripts/entrypoint.py`. O executável deve ser testado em Windows.
+
+**Nota:** os testes automatizados incluídos verificam a preservação dos resultados dos exemplos 5.1 e 5.2; não constituem validação numérica independente.

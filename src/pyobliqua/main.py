@@ -12,14 +12,14 @@ Referência: Campos Filho (2000), exemplos 5.1 e 5.2.
 import argparse
 from math import degrees, radians
 
-from secao.secao import Secao
-from secao.barra import Barra
-from materiais.concreto import Concreto
-from materiais.aco import Aco
-from analise.estado_deformacao import EstadoDeformacao
-from analise.esforcos import esforcos_resistentes
-from analise.equilibrio import resolver_equilibrio
-from analise.verificacao import resolver_verificacao
+from pyobliqua.secao.secao import Secao
+from pyobliqua.secao.barra import Barra
+from pyobliqua.materiais.concreto import Concreto
+from pyobliqua.materiais.aco import Aco
+from pyobliqua.analise.estado_deformacao import EstadoDeformacao
+from pyobliqua.analise.esforcos import esforcos_resistentes
+from pyobliqua.analise.equilibrio import resolver_equilibrio
+from pyobliqua.analise.verificacao import resolver_verificacao
 
 
 def materiais():
